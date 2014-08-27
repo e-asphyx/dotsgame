@@ -1,0 +1,27 @@
+/* http://paletton.com/#uid=1210u0kcglL4Zvw8Eq6eXhmkwen */
+
+html, body {
+	margin: 0;
+	padding: 0;
+	background: #a3aa69;
+	color: #2f3403;
+	font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif;
+	font-size: 18px;
+	text-align: center;
+}
+
+.main-content {
+	display: inline-block;
+	text-align: left;
+}
+
+div.board {
+	background: #f2f6d0;
+	border-radius: 6px;
+	box-sizing: border-box;
+	padding: 10px;
+}
+
+canvas.board {
+	display: block;
+}
