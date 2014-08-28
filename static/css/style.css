@@ -25,3 +25,7 @@ div.board {
 canvas.board {
 	display: block;
 }
+
+.alert {
+	color: rgb(245, 62, 5);
+}

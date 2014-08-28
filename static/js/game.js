@@ -9,31 +9,33 @@ var game = {};
 			},
 		},
 
-		playerA: {
-			radius: 6.5,
-			point: {
-				"fillStyle": "#00ff00"
+		players: {
+			"A": {
+				radius: 6.5,
+				point: {
+					"fillStyle": "rgb(131,172,48)"
+				},
+				area: {
+					"fillStyle": "rgba(131,172,48,0.2)",
+					"strokeStyle": "rgb(131,172,48)",
+					"lineCap": "round",
+					"lineJoin": "round",
+					"lineWidth": 1.0
+				}
 			},
-			area: {
-				"fillStyle": "rgba(0,255,0,0.2)",
- 				"strokeStyle": "#00ff00",
-    			"lineCap": "round",
- 				"lineJoin": "round",
- 				"lineWidth": 1.0
-			}
-		},
 
-		playerB: {
-			radius: 6.5,
-			point: {
-				"fillStyle": "#ff0000"
-			},
-			area: {
-				"fillStyle": "rgba(255,0,0,0.2)",
- 				"strokeStyle": "#ff0000",
-    			"lineCap": "round",
- 				"lineJoin": "round",
- 				"lineWidth": 1.0
+			"B": {
+				radius: 6.5,
+				point: {
+					"fillStyle": "#ff0000"
+				},
+				area: {
+					"fillStyle": "rgba(255,0,0,0.2)",
+					"strokeStyle": "#ff0000",
+					"lineCap": "round",
+					"lineJoin": "round",
+					"lineWidth": 1.0
+				}
 			}
 		}
 	};
@@ -466,6 +468,7 @@ var game = {};
 
 		run: function() {
 			while(!this.done()) this.step();
+			return this;
 		},
 
 		getData: function() {
@@ -484,21 +487,60 @@ var game = {};
 		
 		this.canvas.attr("height", Math.round(this.canvasH + this.style.board.padding * 2 + 1));
 
-		this.points = [];
+		this.points = {
+			"A": [],
+			"B": []
+		};
+		
+		this.areas = {
+			"A": [],
+			"B": []
+		};
 		this.renderGame();
 
-		var self = this;
-		_.bindAll(this, "canvasClick", "runClick", "step");
-		this.canvas.click(this.canvasClick);
-		$("#run-btn").click(this.runClick);
-		$("#step-btn").click(this.step);
+   		this.cid = Number(window.location.hash.substring(1));
+		
+		this.setupConn();
+		
+		this.canvas.click(_.bind(this.canvasClick, this));
 	}
 
 	game.App.prototype = {
+		onMessage: function(evt) {
+			var msg = JSON.parse(event.data);
+  			console.log(msg);
+
+			if(msg.points) {
+				_.each(msg.points, function(p) {
+					this.addPoint(p, msg.cid == this.cid ? "A" : "B");
+				}, this);
+			}
+		},
+
+		displayAlert: function(msg) {
+			$(".alert").html("<h3>" + msg + "</h3>");
+		},
+			
+		setupConn: function() {
+			var loc = window.location;
+			var proto = loc.protocol == "https:" ? "wss:" : "ws:";
+
+			this.conn = new WebSocket(proto + "//" + loc.host + "/websocket?cid=" + this.cid);
+			var self = this;
+			this.conn.onclose = function() {
+				self.displayAlert("Connection closed");
+			};
+			
+			this.conn.onmessage = _.bind(this.onMessage, this);
+		},
+
 		renderGame: function() {
 			this.drawGrid();
-			_.each(this.points, function(p) {
-				this.drawPoint(p, this.style.playerB);
+			
+			_.each(this.points, function(points, player) {
+				_.each(points, function(p) {
+					this.drawPoint(p, this.style.players[player]);
+				}, this);
 			}, this);
 			
 			this.drawBands();
@@ -552,14 +594,13 @@ var game = {};
 			var xs = this.gridStep;
 			var ys = this.gridStep;
 			var pad = this.style.board.padding;
-		
-			if(this.wrap) {
-				var bands = this.wrap.getData();
-				_.each(bands, function(band) {
-					var ctx = this.canvas.get(0).getContext("2d");
+	
+			var ctx = this.canvas.get(0).getContext("2d");
 
+			_.each(this.areas, function(area, player) {
+				_.each(area, function(band) {
 					ctx.save();
-					ctx.setStyle(this.style.playerB.area);
+					ctx.setStyle(this.style.players[player].area);
 
 					ctx.beginPath();
 					ctx.moveTo(
@@ -578,8 +619,59 @@ var game = {};
 					ctx.restore();
 
 				}, this);
-			}
+			}, this);
 			return this;
+		},
+
+		updateAreas: function(player) {
+			/* TODO get only uncaptured points */
+
+			var wrap = new VacuumWrap(this.points[player]);
+			var bands = wrap.run().getData();
+			var area = this.areas[player];
+			this.areas[player] = bands;
+
+			/* Compare lists */
+			if(bands.length != area.length) return true;
+
+			for(var i = 0; i < bands.length; i++) {
+				if(bands[i].length != area[i].length) return true;
+				
+				for(var k = 0; k < bands[i].length; k++) {
+					if(bands[i][k].x != area[i][k].x || bands[i][k].y != area[i][k].y) return true;
+				}
+			}
+
+			return false;
+		},
+
+		newPoint: function(pos) {
+			if(this.conn && this.conn.readyState == WebSocket.OPEN && this.addPoint(pos, "A")) {
+				var msg = {
+					cid: this.cid,
+					points: [pos]
+				};
+				this.conn.send(JSON.stringify(msg));
+			}
+		},
+		
+		addPoint: function(pos, player) {
+			/* TODO all checks here */
+			if(!_.find(this.points[player], function(p){return p.x == pos.x && p.y == pos.y;})) {
+				
+				this.points[player].push(pos);
+				
+				if(this.updateAreas(player)) {
+					console.log("change", player);
+					/* redraw */
+					this.renderGame();
+				} else {
+					this.drawPoint(pos, this.style.players[player]);
+				}
+
+				return true;
+			}
+			return false;
 		},
 		
 		canvasClick: function(evt) {
@@ -598,25 +690,12 @@ var game = {};
 			var xx = offsetX - pad;
 			var yy = offsetY - pad;
 			if(xx >= 0 && yy >= 0) {
-				var xPos = Math.round(xx / this.gridStep);
-				var yPos = Math.round(yy / this.gridStep);
-				if(!_.find(this.points, function(p){return p.x == xPos && p.y == yPos;})) {
-					this.points.push(this.drawPoint({x: xPos, y: yPos}, this.style.playerB));
-				}
+				this.newPoint({
+					x: Math.round(xx / this.gridStep),
+					y: Math.round(yy / this.gridStep)
+				});
 			}
 		},
-
-		runClick: function() {
-			this.wrap = new VacuumWrap(this.points);
-			this.wrap.run();
-			this.renderGame();
-		},
-
-		step: function() {
-			if(!this.wrap) this.wrap = new VacuumWrap(this.points);
-			this.wrap.step();
-			this.renderGame();
-		}
 	};
 })();
 
