@@ -9,12 +9,16 @@ import (
 	"code.google.com/p/go.net/websocket"
 )
 
+type Point struct {
+	X uint `json:"x"`
+	Y uint `json:"y"`
+}
+
 type GameMessage struct {
 	CID uint `json:"cid"`
-	Points []struct {
-		X uint `json:"x"`
-		Y uint `json:"y"`
-	} `json:"points,omitempty"`
+	Points []Point `json:"points,omitempty"`
+	UpdArea uint `json:"updarea"`
+	Area [][]Point `json:"area,omitempty"`
 }
 
 type Client struct {
@@ -85,6 +89,8 @@ func NewGameServer() *GameServer {
 func (client *Client) Cancel() {
 	client.server.remove <- client
 }
+
+/*-------------------------------------------------------------------------------*/
 
 var gameserver *GameServer
 

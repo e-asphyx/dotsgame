@@ -280,7 +280,7 @@ var game = {};
 				if(this.isDiag(node.prev().val, node.val)) {
 					var p = ySort([node.prev().val, node.val]);
 					
-					return !!_.find(check, function(ck) {
+					return _.some(check, function(ck) {
 						return ck[0].y == p[0].y && ck[0].x == p[1].x && p[0].x == ck[1].x;
 					});
 				}
@@ -476,9 +476,12 @@ var game = {};
 		}
 	};
 
+	/*----------------------------------------------------------------------------------------*/
+
 	game.App = function(options) {
 		_.extend(this, _.pick(options, ["style", "xnodes", "ynodes"]));
 		
+   		this.cid = Number(window.location.hash.substring(1));
 		this.canvas = $('#board');
 		
 		this.canvasW = this.canvas.width() - this.style.board.padding * 2 - 1;
@@ -487,33 +490,52 @@ var game = {};
 		
 		this.canvas.attr("height", Math.round(this.canvasH + this.style.board.padding * 2 + 1));
 
-		this.points = {
-			"A": [],
-			"B": []
-		};
-		
-		this.areas = {
-			"A": [],
-			"B": []
-		};
-		this.renderGame();
+		/* TODO */
+		this.playersStyles = {
+			0: this.style.players["A"],
+			1: this.style.players["B"]
+		}
 
-   		this.cid = Number(window.location.hash.substring(1));
-		
+		this.points = {};
+		this.areas = {};
+		this.map = [];
+		_.times(this.ynodes, function(n){this.map[n] = []}, this);
+			
+		this.renderGame();
 		this.setupConn();
-		
 		this.canvas.click(_.bind(this.canvasClick, this));
 	}
 
 	game.App.prototype = {
 		onMessage: function(evt) {
+			/* TODO handle history */
+
 			var msg = JSON.parse(event.data);
   			console.log(msg);
 
 			if(msg.points) {
 				_.each(msg.points, function(p) {
-					this.addPoint(p, msg.cid == this.cid ? "A" : "B");
+					this.addPoint(p, msg.cid, {
+						updateAreas: false,
+						render: !msg.updarea
+					});
 				}, this);
+			}
+
+			if(msg.updarea) {
+				this.areas[msg.cid] = msg.area || [];
+				var upd = this.updateAreas(this.cid);
+				this.renderGame();
+
+				if(upd) {
+					var msg = {
+						cid: this.cid,
+						updarea: 1,
+						area: this.areas[this.cid]
+					};
+					/* update history */
+					this.conn.send(JSON.stringify(msg));
+				}
 			}
 		},
 
@@ -537,9 +559,9 @@ var game = {};
 		renderGame: function() {
 			this.drawGrid();
 			
-			_.each(this.points, function(points, player) {
+			_.each(this.points, function(points, cid) {
 				_.each(points, function(p) {
-					this.drawPoint(p, this.style.players[player]);
+					this.drawPoint(p, this.playersStyles[cid]);
 				}, this);
 			}, this);
 			
@@ -597,10 +619,10 @@ var game = {};
 	
 			var ctx = this.canvas.get(0).getContext("2d");
 
-			_.each(this.areas, function(area, player) {
+			_.each(this.areas, function(area, cid) {
 				_.each(area, function(band) {
 					ctx.save();
-					ctx.setStyle(this.style.players[player].area);
+					ctx.setStyle(this.playersStyles[cid].area);
 
 					ctx.beginPath();
 					ctx.moveTo(
@@ -622,14 +644,24 @@ var game = {};
 			}, this);
 			return this;
 		},
+		
+		mapAt: function(p) {
+			return p.x >= 0 && p.x < this.xnodes && p.y >= 0 && p.y < this.ynodes ?
+				this.map[p.y][p.x] : -1;
+		},
 
-		updateAreas: function(player) {
-			/* TODO get only uncaptured points */
+		updateAreas: function(cid) {
+			/* leave only ot surrounded points */
+			var opponents = _.filter(this.areas, function(bands, id){return id != cid;});
 
-			var wrap = new VacuumWrap(this.points[player]);
+			var points = _.filter(this.points[cid], function(p) {
+				return !_.some(opponents, function(bands){return this.pointSurrounded(p, bands)}, this);
+			}, this);
+				
+			var wrap = new VacuumWrap(points);
 			var bands = wrap.run().getData();
-			var area = this.areas[player];
-			this.areas[player] = bands;
+			var area = this.areas[cid] || [];
+			this.areas[cid] = bands;
 
 			/* Compare lists */
 			if(bands.length != area.length) return true;
@@ -646,32 +678,94 @@ var game = {};
 		},
 
 		newPoint: function(pos) {
-			if(this.conn && this.conn.readyState == WebSocket.OPEN && this.addPoint(pos, "A")) {
+			if(this.conn && this.conn.readyState == WebSocket.OPEN && this.addPoint(pos, this.cid)) {
 				var msg = {
 					cid: this.cid,
 					points: [pos]
 				};
+				
+				/* update history */
+				if(this.areasUpdated) {
+					msg.updarea = 1;
+					msg.area = this.areas[this.cid];
+				} else {
+					msg.updarea = 0;
+				}
 				this.conn.send(JSON.stringify(msg));
 			}
 		},
+
+		pointSurrounded: function(pos, bands) {
+			return _.some(bands, function(b) {
+				var row = [];
+				var rb = new RubberBand(b);
+				rb.each(function(p) {
+					if(p.val.y == pos.y) {
+						var dy0 = p.prev().val.y - p.val.y;
+						var dy1 = p.val.y - p.next().val.y;
+
+						if((dy0 || dy1) && dy0 * dy1 >= 0) {
+							row.push({x: p.val.x, w: dy0 + dy1});
+						}
+					}
+				});
+
+				row = _.sortBy(row, function(p){return p.x;});
+
+				var i = 0, winding = 0;
+				while(i < row.length) {
+					while(i < row.length && !winding) {
+						winding += row[i].w;
+						i++;
+					}
+					var span = row[i - 1].x;
+					while(i < row.length && winding) {
+						winding += row[i].w;
+						i++;
+					}
+					if(pos.x >= span && pos.x <= row[i - 1].x) return true;
+				}
+				return false;
+			});
+		},
 		
-		addPoint: function(pos, player) {
-			/* TODO all checks here */
-			if(!_.find(this.points[player], function(p){return p.x == pos.x && p.y == pos.y;})) {
-				
-				this.points[player].push(pos);
-				
-				if(this.updateAreas(player)) {
-					console.log("change", player);
+		addPoint: function(pos, cid, options) {
+			options = options || {};
+			this.points[cid] = this.points[cid] || [];
+
+			if(_.some(this.points, function(points) {
+					return _.some(points, function(p){return p.x == pos.x && p.y == pos.y;});
+				})) {
+				return false;
+			}
+			
+			if(_.some(this.areas, function(bands){return this.pointSurrounded(pos, bands);}, this)) {
+				return false;
+			}
+
+			var updateNeeded = false;
+			_.times(8, function(n) {
+				var delta = VacuumWrap.prototype.revHourMap[n];
+				updateNeeded = updateNeeded || this.mapAt({
+					x: pos.x + delta.x,
+					y: pos.y + delta.y,
+				}) == cid;
+			}, this);
+
+			this.points[cid].push(pos);
+			this.map[pos.y][pos.x] = cid;
+			
+			this.areasUpdated = (options.updateAreas !== false && updateNeeded) ? this.updateAreas(cid) : false;
+			if(options.render !== false) {
+				if(this.areasUpdated) {
 					/* redraw */
 					this.renderGame();
 				} else {
-					this.drawPoint(pos, this.style.players[player]);
+					this.drawPoint(pos, this.playersStyles[cid]);
 				}
-
-				return true;
 			}
-			return false;
+
+			return true;
 		},
 		
 		canvasClick: function(evt) {
