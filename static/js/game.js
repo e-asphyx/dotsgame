@@ -5,7 +5,7 @@ var game = {};
 			padding: 7.0,
 			grid: {
 				"strokeStyle": "#cccccc",
- 				"lineWidth": 1.0
+				"lineWidth": 1.0
 			},
 		},
 
@@ -71,12 +71,12 @@ var game = {};
 		size: function() {
 			return this.list.length;
 		},
-		
+
 		next: function() {
 			var idx = this._idx();
 			return this.list[idx < this.list.length - 1 ? idx + 1 : 0];
 		},
-		
+
 		prev: function() {
 			var idx = this._idx();
 			return this.list[idx > 0 ? idx - 1 : this.list.length - 1];
@@ -88,7 +88,7 @@ var game = {};
 			this.list.splice(idx + 1, 0, newObj);
 			return newObj;
 		},
-		
+
 		before: function(obj) {
 			var idx = this._idx();
 			var newObj = this._factory(obj);
@@ -113,7 +113,7 @@ var game = {};
 			args.unshift(this.list);
 			return _.find.apply(_, args);
 		},
-		
+
 		each: function(callback, ctx) {
 			var args = Array.prototype.slice.call(arguments);
 			args.unshift(this.list);
@@ -141,32 +141,32 @@ var game = {};
 
 	function VacuumWrap(points) {
 		this.points = points;
-		
+
 		var minx = this.minx = _.min(_.pluck(this.points, 'x'));
 		var maxx = this.maxx = _.max(_.pluck(this.points, 'x'));
 		var miny = this.miny = _.min(_.pluck(this.points, 'y'));
 		var maxy = this.maxy = _.max(_.pluck(this.points, 'y'));
-		
+
 		this.bands = [];
 		if(minx != maxx && miny != maxy) {
 			/* make board map */
 			this.map = [];
-			_.times(maxy - miny + 1, function(n){this.map[n] = []}, this);
+			_.times(maxy - miny + 1, function(n){this.map[n] = [];}, this);
 			_.each(this.points, function(p){this.map[p.y - miny][p.x - minx] = true;}, this);
-			
+
 			/* find spans */
 			var spany = miny;
 			var y = miny;
 			while(y <= maxy) {
 				while(y <= maxy && !this.yGap(y, minx, maxx)) y++;
-				
+
 				if(y - spany > 1) {
 					var spanmaxy = y - 1;
 					var spanx = minx;
 					var x = minx;
 					while(x <= maxx) {
 						while(x <= maxx && !this.xGap(x, spany, spanmaxy)) x++;
-						
+
 						if(x - spanx > 1) this.addBand({x: spanx, y: spany}, {x: x - 1, y: spanmaxy});
 
 						/* skip gap */
@@ -199,17 +199,17 @@ var game = {};
 			{x: -1, y:  0},
 			{x: -1, y: -1},
 		],
-		
+
 		yGap: function(y, minx, maxx) {
 			for(var x = minx; x <= maxx && !this.mapAt({x: x, y: y}); x++);
 			return x > maxx;
 		},
-		
+
 		xGap: function(x, miny, maxy) {
 			for(var y = miny; y <= maxy && !this.mapAt({x: x, y: y}); y++);
 			return y > maxy;
 		},
-		
+
 		addBand: function(min, max) {
 			var band = [];
 			for(var i = min.x; i < max.x; i++) band.push({x: i, y: min.y});
@@ -223,7 +223,7 @@ var game = {};
 				pivot: tmp.prev(),
 				skipped: 0
 			});
-			
+
 		},
 
 		mapAt: function(p) {
@@ -240,11 +240,11 @@ var game = {};
 		isNeighbors: function(p1, p2) {
 			return (Math.abs(p2.x - p1.x) <= 1) && (Math.abs(p2.y - p1.y) <= 1);
 		},
-		
+
 		isDiag: function(p1, p2) {
 			return (Math.abs(p2.x - p1.x) == 1) && (Math.abs(p2.y - p1.y) == 1);
 		},
-		
+
 		getNthNeighbor: function(ref, num) {
 			return {
 				x: ref.x + this.revHourMap[num].x,
@@ -254,7 +254,7 @@ var game = {};
 
 		canInflate: function(ref, node) {
 			if(!this.isDiag(ref, node)) return false;
-		
+
 			var angle = this.getHour(ref, node);
 
 			return this.mapAt(this.getNthNeighbor(ref, (angle - 1) & 0x7)) &&
@@ -279,14 +279,14 @@ var game = {};
 			if(band.find(function(node) {
 				if(this.isDiag(node.prev().val, node.val)) {
 					var p = ySort([node.prev().val, node.val]);
-					
+
 					return _.some(check, function(ck) {
 						return ck[0].y == p[0].y && ck[0].x == p[1].x && p[0].x == ck[1].x;
 					});
 				}
 			}, this)) return true;
-			
-			
+
+
 			var tmp = [];
 			band.each(function(obj) {
 				dx = obj.val.x - obj.prev().val.x;
@@ -296,7 +296,7 @@ var game = {};
 					x: obj.prev().val.x*2 + dx,
 					y: obj.prev().val.y*2 + dy
 				});
-				
+
 				tmp.push({
 					x: obj.val.x*2,
 					y: obj.val.y*2
@@ -306,22 +306,22 @@ var game = {};
 
 			var i = 0;
 			while(i < view.length) {
-				
+
 				var winding = 0;
 				var y = view[i].val.y;
 
 				while(i < view.length && view[i].val.y == y) {
-					
+
 					var x = view[i].val.x;
-				
+
 					while(i < view.length && view[i].val.x == x && view[i].val.y == y) {
 						var inw = view[i].prev().val.y - view[i].val.y;
 						var outw = view[i].val.y - view[i].next().val.y;
-						
+
 						winding += inw + outw;
 						i++;
 					}
-					
+
 					if(winding < 0) return true;
 				}
 			}
@@ -351,7 +351,7 @@ var game = {};
 					this.bands.splice(this.bands.indexOf(band), 1);
 					return;
 				}
-				
+
 				/* maybe split */
 				var opposite;
 				if(opposite = band.token.find(function(node){
@@ -371,7 +371,7 @@ var game = {};
 						pivot: bud.prev(),
 						skipped: 0
 					});
-					
+
 					band.pivot = band.token.prev();
 					band.skipped = 0;
 					return;
@@ -410,7 +410,7 @@ var game = {};
 					for(i = 0; i < angle - 1; i++) {
 					var nb = (outp + i + 1) & 0x7;
 						var newNode = this.getNthNeighbor(band.token.val, nb);
-					
+
 						if(this.isNeighbors(newNode, band.token.prev().val) &&
 								this.isNeighbors(newNode, band.token.next().val)) {
 
@@ -437,14 +437,14 @@ var game = {};
 					for(i = 0; i < angle - 1; i++) {
 						var nb = (outp + i + 1) & 0x7;
 						var newNode = this.getNthNeighbor(band.token.val, nb);
-				
+
 						/* check intersection */
 						if(this.isNeighbors(newNode, band.token.prev().val) &&
 								this.isNeighbors(newNode, band.token.val) &&
 
 								!this.canInflate(band.token.prev().val, newNode) &&
 								!this.canInflate(newNode, band.token.val)) {
-								
+
 							var clone = band.token.deepClone();
 							var n = clone.before(newNode);
 
@@ -478,16 +478,16 @@ var game = {};
 
 	/*----------------------------------------------------------------------------------------*/
 
-	game.App = function(options) {
+	App = game.App = function(options) {
 		_.extend(this, _.pick(options, ["style", "xnodes", "ynodes"]));
-		
-   		this.cid = Number(window.location.hash.substring(1));
+
+		this.cid = Number(window.location.hash.substring(1));
 		this.canvas = $('#board');
-		
+
 		this.canvasW = this.canvas.width() - this.style.board.padding * 2 - 1;
 		this.gridStep = this.canvasW / (this.xnodes - 1);
 		this.canvasH = this.gridStep * (this.ynodes - 1);
-		
+
 		this.canvas.attr("height", Math.round(this.canvasH + this.style.board.padding * 2 + 1));
 
 		/* TODO */
@@ -499,31 +499,39 @@ var game = {};
 		this.points = {};
 		this.areas = {};
 		this.map = [];
-		_.times(this.ynodes, function(n){this.map[n] = []}, this);
-			
+		this.areasMaps = [];
+
+		_.times(this.ynodes, function(n){this.map[n] = [];}, this);
+
 		this.renderGame();
 		this.setupConn();
 		this.canvas.click(_.bind(this.canvasClick, this));
 	}
 
-	game.App.prototype = {
+	App.prototype = {
+		/* flags */
+		FL_UPDAREA: 0x1,
+
 		onMessage: function(evt) {
 			/* TODO handle history */
 
 			var msg = JSON.parse(event.data);
-  			console.log(msg);
+			console.log(msg);
 
-			if(msg.points) {
-				_.each(msg.points, function(p) {
+			if(msg.p) {
+				_.each(msg.p, function(p) {
 					this.addPoint(p, msg.cid, {
 						updateAreas: false,
-						render: !msg.updarea
+						render: !(msg.fl & this.FL_UPDAREA)
 					});
 				}, this);
 			}
 
-			if(msg.updarea) {
-				this.areas[msg.cid] = msg.area || [];
+			if(msg.fl & this.FL_UPDAREA) {
+				this.areas[msg.cid] = msg.a || [];
+				this.updateAreasMap(msg.cid);
+
+				/* update our area to remove completely surrounded bands */
 				var upd = this.updateAreas(this.cid);
 				this.renderGame();
 
@@ -542,7 +550,7 @@ var game = {};
 		displayAlert: function(msg) {
 			$(".alert").html("<h3>" + msg + "</h3>");
 		},
-			
+
 		setupConn: function() {
 			var loc = window.location;
 			var proto = loc.protocol == "https:" ? "wss:" : "ws:";
@@ -552,19 +560,19 @@ var game = {};
 			this.conn.onclose = function() {
 				self.displayAlert("Connection closed");
 			};
-			
+
 			this.conn.onmessage = _.bind(this.onMessage, this);
 		},
 
 		renderGame: function() {
 			this.drawGrid();
-			
+
 			_.each(this.points, function(points, cid) {
 				_.each(points, function(p) {
 					this.drawPoint(p, this.playersStyles[cid]);
 				}, this);
 			}, this);
-			
+
 			this.drawBands();
 			return this;
 		},
@@ -576,7 +584,7 @@ var game = {};
 			ctx.clearRect(0, 0, this.canvasW + pad * 2, this.canvasH + pad * 2);
 			ctx.save();
 			ctx.setStyle(this.style.board.grid);
-			
+
 			var i, x = 0, y = 0;
 			for(i = 0; i < this.xnodes; i++) {
 				ctx.beginPath();
@@ -585,7 +593,7 @@ var game = {};
 				ctx.stroke();
 				x += this.gridStep;
 			}
-		
+
 			for(i = 0; i < this.ynodes; i++) {
 				ctx.beginPath();
 				ctx.moveTo(pad + 0.5, pad + Math.round(y) + 0.5);
@@ -596,7 +604,7 @@ var game = {};
 			ctx.restore();
 			return this;
 		},
-		
+
 		drawPoint: function(point, style) {
 			var pad = this.style.board.padding;
 			var ctx = this.canvas.get(0).getContext("2d");
@@ -616,7 +624,7 @@ var game = {};
 			var xs = this.gridStep;
 			var ys = this.gridStep;
 			var pad = this.style.board.padding;
-	
+
 			var ctx = this.canvas.get(0).getContext("2d");
 
 			_.each(this.areas, function(area, cid) {
@@ -644,91 +652,106 @@ var game = {};
 			}, this);
 			return this;
 		},
-		
+
 		mapAt: function(p) {
 			return p.x >= 0 && p.x < this.xnodes && p.y >= 0 && p.y < this.ynodes ?
 				this.map[p.y][p.x] : -1;
 		},
 
 		updateAreas: function(cid) {
-			/* leave only ot surrounded points */
-			var opponents = _.filter(this.areas, function(bands, id){return id != cid;});
-
+			/* leave only not surrounded points */
 			var points = _.filter(this.points[cid], function(p) {
-				return !_.some(opponents, function(bands){return this.pointSurrounded(p, bands)}, this);
+
+				return !_.some(this.areas, function(bands, id) {
+					return id != cid ? this.pointSurrounded(p, id) : false;
+				}, this);
+
 			}, this);
-				
+
 			var wrap = new VacuumWrap(points);
 			var bands = wrap.run().getData();
 			var area = this.areas[cid] || [];
 			this.areas[cid] = bands;
 
 			/* Compare lists */
-			if(bands.length != area.length) return true;
+			if(bands.length != area.length) {
+				this.updateAreasMap(cid);
+				return true;
+			}
 
 			for(var i = 0; i < bands.length; i++) {
-				if(bands[i].length != area[i].length) return true;
-				
+				if(bands[i].length != area[i].length) {
+					this.updateAreasMap(cid);
+					return true;
+				}
+
 				for(var k = 0; k < bands[i].length; k++) {
-					if(bands[i][k].x != area[i][k].x || bands[i][k].y != area[i][k].y) return true;
+					if(bands[i][k].x != area[i][k].x || bands[i][k].y != area[i][k].y) {
+						this.updateAreasMap(cid);
+						return true;
+					}
 				}
 			}
 
 			return false;
 		},
 
+		updateAreasMap: function(cid) {
+			var map = [];
+			_.times(this.ynodes, function(n){map[n] = [];}, this);
+
+			_.each(this.areas[cid], function(b) {
+				var view = _.sortBy(_.sortBy(new RubberBand(b).getAll(), function(o){return o.val.x;}), function(o){return o.val.y;});
+
+				var i = 0;
+				while(i < view.length) {
+					var winding = 0;
+
+					var y = view[i].val.y;
+
+					var xspan = view[i].val.x;
+					while(i < view.length && view[i].val.y == y) {
+						var x = view[i].val.x;
+
+						while(xspan < x) {
+							if(winding) map[y][xspan] = true;
+							xspan++;
+						}
+
+						while(i < view.length && view[i].val.x == x && view[i].val.y == y) {
+							var inw = view[i].prev().val.y - view[i].val.y;
+							var outw = view[i].val.y - view[i].next().val.y;
+							winding += inw + outw;
+							i++;
+						}
+					}
+				}
+			});
+
+			this.areasMaps[cid] = map;
+		},
+
 		newPoint: function(pos) {
 			if(this.conn && this.conn.readyState == WebSocket.OPEN && this.addPoint(pos, this.cid)) {
 				var msg = {
 					cid: this.cid,
-					points: [pos]
+					p: [pos],
+					fl: 0
 				};
-				
+
 				/* update history */
 				if(this.areasUpdated) {
-					msg.updarea = 1;
-					msg.area = this.areas[this.cid];
-				} else {
-					msg.updarea = 0;
+					msg.fl |= this.FL_UPDAREA;
+					msg.a = this.areas[this.cid];
 				}
 				this.conn.send(JSON.stringify(msg));
 			}
 		},
 
-		pointSurrounded: function(pos, bands) {
-			return _.some(bands, function(b) {
-				var row = [];
-				var rb = new RubberBand(b);
-				rb.each(function(p) {
-					if(p.val.y == pos.y) {
-						var dy0 = p.prev().val.y - p.val.y;
-						var dy1 = p.val.y - p.next().val.y;
-
-						if((dy0 || dy1) && dy0 * dy1 >= 0) {
-							row.push({x: p.val.x, w: dy0 + dy1});
-						}
-					}
-				});
-
-				row = _.sortBy(row, function(p){return p.x;});
-
-				var i = 0, winding = 0;
-				while(i < row.length) {
-					while(i < row.length && !winding) {
-						winding += row[i].w;
-						i++;
-					}
-					var span = row[i - 1].x;
-					while(i < row.length && winding) {
-						winding += row[i].w;
-						i++;
-					}
-					if(pos.x >= span && pos.x <= row[i - 1].x) return true;
-				}
-				return false;
-			});
+		pointSurrounded: function(pos, cid) {
+			return this.areasMaps[cid] ? !!this.areasMaps[cid][pos.y][pos.x] : false;
 		},
-		
+
 		addPoint: function(pos, cid, options) {
 			options = options || {};
 			this.points[cid] = this.points[cid] || [];
@@ -738,8 +761,8 @@ var game = {};
 				})) {
 				return false;
 			}
-			
-			if(_.some(this.areas, function(bands){return this.pointSurrounded(pos, bands);}, this)) {
+
+			if(_.some(this.areas, function(bands, cid){return this.pointSurrounded(pos, cid);}, this)) {
 				return false;
 			}
 
@@ -754,7 +777,7 @@ var game = {};
 
 			this.points[cid].push(pos);
 			this.map[pos.y][pos.x] = cid;
-			
+
 			this.areasUpdated = (options.updateAreas !== false && updateNeeded) ? this.updateAreas(cid) : false;
 			if(options.render !== false) {
 				if(this.areasUpdated) {
@@ -767,19 +790,19 @@ var game = {};
 
 			return true;
 		},
-		
+
 		canvasClick: function(evt) {
 			var offsetX, offsetY;
-			
+
 			if(evt.offsetX != undefined) {
 				offsetX = evt.offsetX;
 				offsetY = evt.offsetY;
 			} else {
-    			var rect = evt.target.getBoundingClientRect();
+				var rect = evt.target.getBoundingClientRect();
 				offsetX = evt.clientX - rect.left;
-          		offsetY = evt.clientY - rect.top;
+				offsetY = evt.clientY - rect.top;
 			}
-			
+
 			var pad = this.style.board.padding;
 			var xx = offsetX - pad;
 			var yy = offsetY - pad;
