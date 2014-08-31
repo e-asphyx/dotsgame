@@ -16,9 +16,9 @@ type Point struct {
 
 type GameMessage struct {
 	CID uint `json:"cid"`
-	Points []Point `json:"p,omitempty"`
+	Points map[string][]Point `json:"p,omitempty"`
 	Flags uint `json:"fl"`
-	Area [][]Point `json:"a,omitempty"`
+	Areas map[string][][]Point `json:"a,omitempty"`
 }
 
 type Client struct {

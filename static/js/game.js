@@ -477,6 +477,13 @@ var game = {};
 	};
 
 	/*----------------------------------------------------------------------------------------*/
+	function MsgMap(lst) {
+		if(!(lst instanceof Array)) lst = [lst];
+
+		_.each(lst, function(obj) {
+			this[obj.cid] = obj.data;
+		}, this);
+	};
 
 	App = game.App = function(options) {
 		_.extend(this, _.pick(options, ["style", "xnodes", "ynodes"]));
@@ -509,42 +516,29 @@ var game = {};
 	}
 
 	App.prototype = {
-		/* flags */
-		FL_UPDAREA: 0x1,
-
 		onMessage: function(evt) {
-			/* TODO handle history */
-
 			var msg = JSON.parse(event.data);
 			console.log(msg);
 
 			if(msg.p) {
-				_.each(msg.p, function(p) {
-					this.addPoint(p, msg.cid, {
-						updateAreas: false,
-						render: !(msg.fl & this.FL_UPDAREA)
-					});
+				_.each(msg.p, function(points, cid) {
+					_.each(points, function(p) {
+						this.addPoint(p, cid, {
+							updateAreas: false,
+							render: false
+						});
+					}, this);
 				}, this);
 			}
 
-			if(msg.fl & this.FL_UPDAREA) {
-				this.areas[msg.cid] = msg.a || [];
-				this.updateAreasMap(msg.cid);
-
-				/* update our area to remove completely surrounded bands */
-				var upd = this.updateAreas(this.cid);
-				this.renderGame();
-
-				if(upd) {
-					var msg = {
-						cid: this.cid,
-						updarea: 1,
-						area: this.areas[this.cid]
-					};
-					/* update history */
-					this.conn.send(JSON.stringify(msg));
-				}
+			if(msg.a) {
+				_.each(msg.a, function(area, cid) {
+					this.areas[cid] = area;
+					this.updateAreasMap(cid);
+				}, this);
 			}
+			
+			this.renderGame();
 		},
 
 		displayAlert: function(msg) {
@@ -658,12 +652,30 @@ var game = {};
 				this.map[p.y][p.x] : -1;
 		},
 
+		/* don't rebuild areas, just remove completely surrounded bands */
+		removeSurrounded: function(cid) {
+			var upd = false;
+			var area = this.areas[cid];
+			_.each(area, function(band, idx) {
+				
+				if(_.some(band, function(p) {
+					return _.some(this.areas, function(b, id){return id != cid && this.pointSurrounded(p, id);}, this);
+				}, this)) {
+					/* remove band */
+					area.splice(idx, 1);
+					upd = true;
+				}
+			}, this);
+
+			return upd;
+		},
+
 		updateAreas: function(cid) {
 			/* leave only not surrounded points */
 			var points = _.filter(this.points[cid], function(p) {
 
-				return !_.some(this.areas, function(bands, id) {
-					return id != cid ? this.pointSurrounded(p, id) : false;
+				return !_.some(this.areas, function(b, id) {
+					return id != cid && this.pointSurrounded(p, id);
 				}, this);
 
 			}, this);
@@ -735,14 +747,21 @@ var game = {};
 			if(this.conn && this.conn.readyState == WebSocket.OPEN && this.addPoint(pos, this.cid)) {
 				var msg = {
 					cid: this.cid,
-					p: [pos],
-					fl: 0
+					p: new MsgMap({cid: this.cid, data: [pos]})
 				};
 
-				/* update history */
-				if(this.areasUpdated) {
-					msg.fl |= this.FL_UPDAREA;
-					msg.a = this.areas[this.cid];
+				if(this.areaUpdated) {
+					msg.a = new MsgMap({cid: this.cid, data: this.areas[this.cid]});
+
+					/* check other areas */
+					var upd = false;
+					_.each(this.areas, function(b, cid) {
+						if(cid != this.cid && this.removeSurrounded(cid)) {
+							msg.a[cid] = this.areas[cid];
+							upd = true;
+						}
+					}, this);
+					if(upd) this.renderGame();
 				}
 				this.conn.send(JSON.stringify(msg));
 			}
@@ -778,9 +797,9 @@ var game = {};
 			this.points[cid].push(pos);
 			this.map[pos.y][pos.x] = cid;
 
-			this.areasUpdated = (options.updateAreas !== false && updateNeeded) ? this.updateAreas(cid) : false;
+			this.areaUpdated = (options.updateAreas !== false && updateNeeded) ? this.updateAreas(cid) : false;
 			if(options.render !== false) {
-				if(this.areasUpdated) {
+				if(this.areaUpdated) {
 					/* redraw */
 					this.renderGame();
 				} else {
