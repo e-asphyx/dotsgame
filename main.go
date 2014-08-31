@@ -6,7 +6,14 @@ import (
 	"io"
 	"strconv"
 	"container/list"
+	"database/sql"
+	"crypto/rand"
+	"encoding/base64"
+	"html/template"
+
 	"code.google.com/p/go.net/websocket"
+	_ "github.com/lib/pq"
+	"github.com/gorilla/mux"
 )
 
 type Point struct {
@@ -15,14 +22,14 @@ type Point struct {
 }
 
 type GameMessage struct {
-	CID uint `json:"cid"`
+	CID uint64 `json:"cid"`
 	Points map[string][]Point `json:"p,omitempty"`
 	Flags uint `json:"fl"`
 	Areas map[string][][]Point `json:"a,omitempty"`
 }
 
 type Client struct {
-	cid uint
+	cid uint64
 	server *GameServer
 	msg chan *GameMessage
 }
@@ -61,7 +68,7 @@ func (srv *GameServer) gameServer() {
 	}
 }
 
-func (srv *GameServer) NewClient(cid uint) *Client {
+func (srv *GameServer) NewClient(cid uint64) *Client {
 	client := Client {
 		cid: cid,
 		msg: make(chan *GameMessage, 32),
@@ -92,16 +99,80 @@ func (client *Client) Cancel() {
 
 /*-------------------------------------------------------------------------------*/
 
-var gameserver *GameServer
+const (
+	templatesRoot = "templates/"
+	templateMain = "index.html"
+)
+
+var (
+	gameserver  = NewGameServer()
+	templates = template.Must(template.ParseFiles(templatesRoot + templateMain))
+
+	db *sql.DB
+)
+
+func randStr(n uint) string {
+	buf := make([]byte, n)
+	rand.Read(buf)
+    return base64.URLEncoding.EncodeToString(buf)
+}
+
+func NewRoom(w http.ResponseWriter, req *http.Request) {
+	/* new room */
+	newUid := randStr(6)
+
+	var roomId int64
+	err := db.QueryRow("INSERT INTO room(uid) VALUES ($1) RETURNING id", newUid).Scan(&roomId)
+
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	} else {
+		log.Printf("New room: %s (%d)\n", newUid, roomId)
+		http.Redirect(w, req, "/" + newUid + "/", http.StatusTemporaryRedirect)
+	}
+	return
+}
+
+func getRoomId(uid string) (int64, error) {
+	var roomId int64
+	err := db.QueryRow("SELECT id FROM room WHERE uid=$1", uid).Scan(&roomId)
+	return roomId, err
+}
+
+func MainServer(w http.ResponseWriter, req *http.Request) {
+	uid := mux.Vars(req)["uid"]
+
+	_, err := getRoomId(uid)
+	if err != nil {
+		log.Println(err)
+		http.NotFound(w, req)
+		return
+	}
+
+	err = templates.ExecuteTemplate(w, templateMain, nil)
+    if err != nil {
+		log.Println(err)
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
+}
 
 func WebSocketServer(ws *websocket.Conn) {
+	uid := mux.Vars(ws.Request())["uid"]
+
+	roomId, err := getRoomId(uid)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
 	tmp := ws.Request().FormValue("cid")
 	if tmp == "" {
 		return
 	}
 	cid, _ := strconv.ParseUint(tmp, 10, 0)
 
-	log.Printf("Connected CID: %d\n", cid)
+	log.Printf("Connected cid %d to room %d (%s)\n", cid, roomId, uid)
 
 	/* WebSocket reading wrapper */
 	incoming := make(chan *GameMessage)
@@ -115,13 +186,13 @@ func WebSocketServer(ws *websocket.Conn) {
 					return
 				}
 				/* skip unmarshalling errors */
-			} else if msg.CID == uint(cid) {
+			} else if msg.CID == cid {
 				incoming <- msg
 			}
 		}
 	}()
 
-	client := gameserver.NewClient(uint(cid))
+	client := gameserver.NewClient(cid)
 	defer client.Cancel()
 
 	/* main loop */
@@ -141,14 +212,30 @@ func WebSocketServer(ws *websocket.Conn) {
 func main() {
 	log.Println("Start")
 
-	gameserver = NewGameServer()
+	var err error
+	db, err = sql.Open("postgres", "user=asphyx dbname=dotsgame sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err = db.Ping(); err != nil {
+		log.Fatal(err)
+	}
+
+	router := mux.NewRouter()
+	router.StrictSlash(true)
+
+	/* Main page */
+	router.HandleFunc("/", NewRoom)
+	router.HandleFunc("/{uid}/", MainServer)
 
 	/* Serve WebSocket */
-	http.Handle("/websocket", websocket.Handler(WebSocketServer))
+	router.Handle("/{uid}/websocket", websocket.Handler(WebSocketServer))
 
 	/* Serve static */
-	http.Handle("/static/", http.FileServer(http.Dir("")))
+	router.PathPrefix("/static/").Handler(http.FileServer(http.Dir("")))
 
+	http.Handle("/", router)
 	/* Start server */
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

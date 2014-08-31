@@ -549,7 +549,9 @@ var game = {};
 			var loc = window.location;
 			var proto = loc.protocol == "https:" ? "wss:" : "ws:";
 
-			this.conn = new WebSocket(proto + "//" + loc.host + "/websocket?cid=" + this.cid);
+			this.conn = new WebSocket(proto + "//" + loc.host + loc.pathname +
+					(loc.pathname[loc.pathname.length - 1] != "/" ? "/" : "") +
+					"websocket?cid=" + this.cid);
 			var self = this;
 			this.conn.onclose = function() {
 				self.displayAlert("Connection closed");
