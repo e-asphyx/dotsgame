@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"io"
 	"strconv"
-	"container/list"
 	"database/sql"
 	"crypto/rand"
 	"encoding/base64"
@@ -17,92 +16,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type Point struct {
-	X uint `json:"x"`
-	Y uint `json:"y"`
-}
-
-type GameMessage struct {
-	roomId uint64 `json:"-"`
-
-	CID uint64 `json:"cid"`
-	Flags uint `json:"fl"`
-
-	Points map[string][]Point `json:"p,omitempty"`
-	Areas map[string][][]Point `json:"a,omitempty"`
-}
-
-type Client struct {
-	cid uint64
-	roomId uint64
-	server *GameServer
-	msg chan *GameMessage
-}
-
-type GameServer struct {
-	add chan *Client
-	remove chan *Client
-	msg chan *GameMessage
-}
-
-func (srv *GameServer) gameServer() {
-	clients := list.New()
-	/* main loop */
-	for {
-		select {
-			case cl := <-srv.add:
-				clients.PushBack(cl)
-
-			case cl := <-srv.remove:
-				for e := clients.Front(); e != nil; e = e.Next() {
-					if e.Value.(*Client) == cl {
-						clients.Remove(e)
-						break
-					}
-				}
-
-			case msg := <-srv.msg:
-				for e := clients.Front(); e != nil; e = e.Next() {
-					client := e.Value.(*Client)
-
-					if client.roomId == msg.roomId && client.cid != msg.CID {
-						client.msg <- msg
-					}
-				}
-		}
-	}
-}
-
-func (srv *GameServer) NewClient(cid uint64, roomId uint64) *Client {
-	client := Client {
-		cid: cid,
-		roomId: roomId,
-		msg: make(chan *GameMessage, 32),
-		server: srv,
-	}
-	srv.add <- &client
-
-	return &client
-}
-
-func (srv *GameServer) Post(msg *GameMessage) {
-	srv.msg <- msg
-}
-
-func NewGameServer() *GameServer {
-	srv := GameServer {
-		add: make(chan *Client),
-		remove: make(chan *Client),
-		msg: make(chan *GameMessage, 32),
-	}
-	go srv.gameServer()
-	return &srv
-}
-
-func (client *Client) Cancel() {
-	client.server.remove <- client
-}
-
 /*-------------------------------------------------------------------------------*/
 
 const (
@@ -111,7 +24,6 @@ const (
 )
 
 var (
-	gameserver  = NewGameServer()
 	templates = template.Must(template.ParseFiles(templatesRoot + templateMain))
 
 	db *sql.DB
@@ -279,7 +191,10 @@ func WebSocketServer(ws *websocket.Conn) {
 		}
 	}()
 
-	client := gameserver.NewClient(cid, roomId)
+	room := Pool.Get(roomId)
+	defer room.Put()
+
+	client := room.NewClient(cid)
 	defer client.Cancel()
 
 	/* load history */
@@ -306,7 +221,7 @@ func WebSocketServer(ws *websocket.Conn) {
 					log.Println(err)
 					return
 				}
-				gameserver.Post(msg)
+				room.Post(msg)
 
 			case msg := <-client.msg:
 				err := websocket.JSON.Send(ws, msg)
