@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"html/template"
 
 	"code.google.com/p/go.net/websocket"
@@ -121,7 +122,7 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 	/* new room */
 	newUid := randStr(6)
 
-	var roomId int64
+	var roomId uint64
 	err := db.QueryRow("INSERT INTO room(uid) VALUES ($1) RETURNING id", newUid).Scan(&roomId)
 
 	if err != nil {
@@ -134,8 +135,8 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 	return
 }
 
-func getRoomId(uid string) (int64, error) {
-	var roomId int64
+func getRoomId(uid string) (uint64, error) {
+	var roomId uint64
 	err := db.QueryRow("SELECT id FROM room WHERE uid=$1", uid).Scan(&roomId)
 	return roomId, err
 }
@@ -155,6 +156,87 @@ func MainServer(w http.ResponseWriter, req *http.Request) {
 		log.Println(err)
         http.Error(w, err.Error(), http.StatusInternalServerError)
     }
+}
+
+func postHistory(roomId uint64, msg *GameMessage) error {
+	tx, err := db.Begin()
+	if err != nil {return err}
+	defer tx.Rollback()
+
+	for cid, points := range msg.Points {
+		for _, p := range points {
+			_, err := tx.Exec("INSERT INTO point(room_id, cid, x, y) VALUES ($1, $2, $3, $4)", roomId, cid, p.X, p.Y)
+			if err != nil {return err}
+		}
+	}
+
+	for cid, area := range msg.Areas {
+		jsondata, _ := json.Marshal(area)
+		res, err := tx.Exec("UPDATE area SET area = $1 WHERE room_id = $2 AND cid = $3", jsondata, roomId, cid)
+		if err != nil {return err}
+
+		if affected, _ := res.RowsAffected(); affected == 0 {
+			_, err := tx.Exec("INSERT INTO area(room_id, cid, area) VALUES ($1, $2, $3)", roomId, cid, jsondata)
+			if err != nil {return err}
+		}
+	}
+
+	return tx.Commit()
+}
+
+func loadHistory(roomId uint64) (*GameMessage, error) {
+	tx, err := db.Begin()
+	if err != nil {return nil, err}
+	defer tx.Rollback()
+
+	msg := GameMessage {
+		Points: make(map[string][]Point),
+		Areas: make(map[string][][]Point),
+	}
+
+	rows, err := tx.Query("SELECT cid, x, y FROM point WHERE room_id=$1", roomId)
+	if err != nil {return nil, err}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			cid string
+			x, y uint
+		)
+
+		err = rows.Scan(&cid, &x, &y)
+		if err != nil {return nil, err}
+
+		msg.Points[cid] = append(msg.Points[cid], Point{x, y})
+	}
+	err = rows.Err()
+	if err != nil {return nil, err}
+
+	rows, err = tx.Query("SELECT cid, area FROM area WHERE room_id=$1", roomId)
+	if err != nil {return nil, err}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			cid string
+			area []byte
+			points [][]Point
+		)
+
+		err = rows.Scan(&cid, &area)
+		if err != nil {return nil, err}
+
+		err = json.Unmarshal(area, &points)
+		if err != nil {
+			log.Println(err)
+		} else {
+			msg.Areas[cid] = points
+		}
+	}
+	err = rows.Err()
+	if err != nil {return nil, err}
+
+	return &msg, nil
 }
 
 func WebSocketServer(ws *websocket.Conn) {
@@ -195,15 +277,32 @@ func WebSocketServer(ws *websocket.Conn) {
 	client := gameserver.NewClient(cid)
 	defer client.Cancel()
 
+	/* load history */
+	hist, err := loadHistory(roomId)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	if len(hist.Points) != 0 || len(hist.Areas) != 0 {
+		err := websocket.JSON.Send(ws, hist)
+		if err != nil {return}
+	}
+
 	/* main loop */
 	for {
 		select {
 			case msg, ok := <-incoming:
 				if !ok {return}
+				err := postHistory(roomId, msg)
+				if err != nil {
+					log.Println(err)
+					return
+				}
 				gameserver.Post(msg)
 
 			case msg := <-client.msg:
-				err := websocket.JSON.Send(ws, msg);
+				err := websocket.JSON.Send(ws, msg)
 				if err != nil {return}
 		}
 	}
