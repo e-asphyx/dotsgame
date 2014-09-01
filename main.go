@@ -23,14 +23,18 @@ type Point struct {
 }
 
 type GameMessage struct {
+	roomId uint64 `json:"-"`
+
 	CID uint64 `json:"cid"`
-	Points map[string][]Point `json:"p,omitempty"`
 	Flags uint `json:"fl"`
+
+	Points map[string][]Point `json:"p,omitempty"`
 	Areas map[string][][]Point `json:"a,omitempty"`
 }
 
 type Client struct {
 	cid uint64
+	roomId uint64
 	server *GameServer
 	msg chan *GameMessage
 }
@@ -61,7 +65,7 @@ func (srv *GameServer) gameServer() {
 				for e := clients.Front(); e != nil; e = e.Next() {
 					client := e.Value.(*Client)
 
-					if client.cid != msg.CID {
+					if client.roomId == msg.roomId && client.cid != msg.CID {
 						client.msg <- msg
 					}
 				}
@@ -69,9 +73,10 @@ func (srv *GameServer) gameServer() {
 	}
 }
 
-func (srv *GameServer) NewClient(cid uint64) *Client {
+func (srv *GameServer) NewClient(cid uint64, roomId uint64) *Client {
 	client := Client {
 		cid: cid,
+		roomId: roomId,
 		msg: make(chan *GameMessage, 32),
 		server: srv,
 	}
@@ -158,25 +163,25 @@ func MainServer(w http.ResponseWriter, req *http.Request) {
     }
 }
 
-func postHistory(roomId uint64, msg *GameMessage) error {
+func postHistory(msg *GameMessage) error {
 	tx, err := db.Begin()
 	if err != nil {return err}
 	defer tx.Rollback()
 
 	for cid, points := range msg.Points {
 		for _, p := range points {
-			_, err := tx.Exec("INSERT INTO point(room_id, cid, x, y) VALUES ($1, $2, $3, $4)", roomId, cid, p.X, p.Y)
+			_, err := tx.Exec("INSERT INTO point(room_id, cid, x, y) VALUES ($1, $2, $3, $4)", msg.roomId, cid, p.X, p.Y)
 			if err != nil {return err}
 		}
 	}
 
 	for cid, area := range msg.Areas {
 		jsondata, _ := json.Marshal(area)
-		res, err := tx.Exec("UPDATE area SET area = $1 WHERE room_id = $2 AND cid = $3", jsondata, roomId, cid)
+		res, err := tx.Exec("UPDATE area SET area = $1 WHERE room_id = $2 AND cid = $3", jsondata, msg.roomId, cid)
 		if err != nil {return err}
 
 		if affected, _ := res.RowsAffected(); affected == 0 {
-			_, err := tx.Exec("INSERT INTO area(room_id, cid, area) VALUES ($1, $2, $3)", roomId, cid, jsondata)
+			_, err := tx.Exec("INSERT INTO area(room_id, cid, area) VALUES ($1, $2, $3)", msg.roomId, cid, jsondata)
 			if err != nil {return err}
 		}
 	}
@@ -274,7 +279,7 @@ func WebSocketServer(ws *websocket.Conn) {
 		}
 	}()
 
-	client := gameserver.NewClient(cid)
+	client := gameserver.NewClient(cid, roomId)
 	defer client.Cancel()
 
 	/* load history */
@@ -294,7 +299,9 @@ func WebSocketServer(ws *websocket.Conn) {
 		select {
 			case msg, ok := <-incoming:
 				if !ok {return}
-				err := postHistory(roomId, msg)
+				msg.roomId = roomId
+
+				err := postHistory(msg)
 				if err != nil {
 					log.Println(err)
 					return
