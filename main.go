@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"io"
 	"strconv"
-	"crypto/rand"
-	"encoding/base64"
 	"html/template"
 
 	"code.google.com/p/go.net/websocket"
@@ -30,12 +28,6 @@ type newUserReply struct {
 	AuthToken string `json:"token"`
 }
 
-func randStr(n uint) string {
-	buf := make([]byte, n)
-	rand.Read(buf)
-    return base64.URLEncoding.EncodeToString(buf)
-}
-
 func NewRoom(w http.ResponseWriter, req *http.Request) {
 	/* new room */
 	newUid := randStr(6)
@@ -50,6 +42,25 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 
 	log.Printf("New room: %s (%d)\n", newUid, roomId)
 	http.Redirect(w, req, "/" + newUid + "/", http.StatusTemporaryRedirect)
+}
+
+func Login(w http.ResponseWriter, req *http.Request) {
+	token := req.FormValue("token")
+	cid, err := db.VerifyToken(token)
+
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return
+	}
+
+	err = TokenAuthAuthenticate(w, cid)
+
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Printf("User %d logged in\n", cid)
 }
 
 func NewUser(req *http.Request) (interface{}, error) {
@@ -159,12 +170,15 @@ func main() {
 	/* API */
 	router.Handle("/api/newuser", JSONHandlerFunc(NewUser)) /* TODO delete this */
 
+	/* token login */
+	router.HandleFunc("/login", Login) /* TODO delete this */
+
 	/* Main page */
-	router.HandleFunc("/", NewRoom)
-	router.HandleFunc("/{uid}/", MainServer)
+	router.Handle("/", &TokenAuthWrapper{handler: http.HandlerFunc(NewRoom)})
+	router.Handle("/{uid}/", &TokenAuthWrapper{handler: http.HandlerFunc(MainServer)})
 
 	/* Serve WebSocket */
-	router.Handle("/{uid}/websocket", websocket.Handler(WebSocketServer))
+	router.Handle("/{uid}/websocket", &TokenAuthWrapper{handler: websocket.Handler(WebSocketServer)})
 
 	http.Handle("/", router)
 	/* Start server */

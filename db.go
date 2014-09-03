@@ -10,9 +10,15 @@ import (
 type DBProxy interface {
 	RoomId(uid string) (uint64, error)
 	NewRoom(uid string) (uint64, error)
+
 	NewUser(token string) (uint64, error)
+	VerifyToken(token string) (uint64, error)
+
 	PostHistory(msg *GameMessage) error
 	LoadHistory(id uint64) (*GameMessage, error)
+
+	SetAuthToken(cid uint64, token string) error
+	VerifyAuthToken(token string) (uint64, error)
 }
 
 /* PostgreSQL proxy */
@@ -125,4 +131,21 @@ func (db *PQProxy) NewUser(token string) (uint64, error) {
 	var cid uint64
 	err := db.QueryRow("INSERT INTO client (auth_token) VALUES ($1) RETURNING id", token).Scan(&cid)
 	return cid, err
+}
+
+func (db *PQProxy) VerifyToken(token string) (uint64, error) {
+	var cid uint64
+	err := db.QueryRow("SELECT id FROM client WHERE auth_token = $1", token).Scan(&cid)
+	return cid, err
+}
+
+func (db *PQProxy) VerifyAuthToken(token string) (uint64, error) {
+	var cid uint64
+	err := db.QueryRow("SELECT id FROM client WHERE session_token = $1", token).Scan(&cid)
+	return cid, err
+}
+
+func (db *PQProxy) SetAuthToken(cid uint64, token string) error {
+	_, err := db.Exec("UPDATE client SET session_token = $1 WHERE id = $2", token, cid)
+	return err
 }
