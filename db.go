@@ -10,6 +10,7 @@ import (
 type DBProxy interface {
 	RoomId(uid string) (uint64, error)
 	NewRoom(uid string) (uint64, error)
+	NewUser(token string) (uint64, error)
 	PostHistory(msg *GameMessage) error
 	LoadHistory(id uint64) (*GameMessage, error)
 }
@@ -38,7 +39,7 @@ func (db *PQProxy) RoomId(uid string) (uint64, error) {
 
 func (db *PQProxy) NewRoom(uid string) (uint64, error) {
 	var roomId uint64
-	err := db.QueryRow("INSERT INTO room(uid) VALUES ($1) RETURNING id", uid).Scan(&roomId)
+	err := db.QueryRow("INSERT INTO room (uid) VALUES ($1) RETURNING id", uid).Scan(&roomId)
 	return roomId, err
 }
 
@@ -46,7 +47,7 @@ func (db *PQProxy) PostHistory(msg *GameMessage) error {
 	/* Insert point(s) */
 	for cid, points := range msg.Points {
 		for _, p := range points {
-			_, err := db.Exec("INSERT INTO point(room_id, cid, x, y) VALUES ($1, $2, $3, $4)", msg.roomId, cid, p.X, p.Y)
+			_, err := db.Exec("INSERT INTO point (room_id, cid, x, y) VALUES ($1, $2, $3, $4)", msg.roomId, cid, p.X, p.Y)
 			if err != nil {return err}
 		}
 	}
@@ -58,7 +59,7 @@ func (db *PQProxy) PostHistory(msg *GameMessage) error {
 		if err != nil {return err}
 
 		if affected, _ := res.RowsAffected(); affected == 0 {
-			_, err := db.Exec("INSERT INTO area(room_id, cid, area) VALUES ($1, $2, $3)", msg.roomId, cid, jsondata)
+			_, err := db.Exec("INSERT INTO area (room_id, cid, area) VALUES ($1, $2, $3)", msg.roomId, cid, jsondata)
 			if err != nil {return err}
 		}
 	}
@@ -120,3 +121,8 @@ func (db *PQProxy) LoadHistory(id uint64) (*GameMessage, error) {
 	return &msg, nil
 }
 
+func (db *PQProxy) NewUser(token string) (uint64, error) {
+	var cid uint64
+	err := db.QueryRow("INSERT INTO client (auth_token) VALUES ($1) RETURNING id", token).Scan(&cid)
+	return cid, err
+}

@@ -25,6 +25,11 @@ var (
 	db DBProxy
 )
 
+type newUserReply struct {
+	ID uint64 `json:"id"`
+	AuthToken string `json:"token"`
+}
+
 func randStr(n uint) string {
 	buf := make([]byte, n)
 	rand.Read(buf)
@@ -40,11 +45,27 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-	} else {
-		log.Printf("New room: %s (%d)\n", newUid, roomId)
-		http.Redirect(w, req, "/" + newUid + "/", http.StatusTemporaryRedirect)
+		return
 	}
-	return
+
+	log.Printf("New room: %s (%d)\n", newUid, roomId)
+	http.Redirect(w, req, "/" + newUid + "/", http.StatusTemporaryRedirect)
+}
+
+func NewUser(req *http.Request) (interface{}, error) {
+	token := randStr(20)
+
+	cid, err := db.NewUser(token)
+	if err != nil {return nil, err}
+
+	log.Printf("New user: %d\n", cid)
+
+	reply := newUserReply {
+		ID: cid,
+		AuthToken: token,
+	}
+
+	return &reply, nil
 }
 
 func MainServer(w http.ResponseWriter, req *http.Request) {
@@ -132,15 +153,18 @@ func main() {
 	router := mux.NewRouter()
 	router.StrictSlash(true)
 
+	/* Serve static */
+	router.PathPrefix("/static/").Handler(http.FileServer(http.Dir("")))
+
+	/* API */
+	router.Handle("/api/newuser", JSONHandlerFunc(NewUser)) /* TODO delete this */
+
 	/* Main page */
 	router.HandleFunc("/", NewRoom)
 	router.HandleFunc("/{uid}/", MainServer)
 
 	/* Serve WebSocket */
 	router.Handle("/{uid}/websocket", websocket.Handler(WebSocketServer))
-
-	/* Serve static */
-	router.PathPrefix("/static/").Handler(http.FileServer(http.Dir("")))
 
 	http.Handle("/", router)
 	/* Start server */
