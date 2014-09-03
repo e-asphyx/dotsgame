@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"container/list"
 )
 
@@ -56,6 +57,14 @@ func (srv *GameServer) gameServer() {
 			if !ok {return}
 			clients.PushBack(cl)
 
+			/* load history */
+			hist, err := db.LoadHistory(srv.roomId)
+			if err != nil {
+				log.Printf("db.LoadHistory: %s\n", err.Error())
+			} else if len(hist.Points) != 0 || len(hist.Areas) != 0 {
+				cl.msg <- hist
+			}
+
 			case cl := <-srv.remove:
 			for e := clients.Front(); e != nil; e = e.Next() {
 				if e.Value.(*Client) == cl {
@@ -65,6 +74,11 @@ func (srv *GameServer) gameServer() {
 			}
 
 			case msg := <-srv.msg:
+			/* post history */
+			if err := db.PostHistory(msg); err != nil {
+				log.Printf("db.PostHistory: %s\n", err.Error())
+			}
+
 			for e := clients.Front(); e != nil; e = e.Next() {
 				client := e.Value.(*Client)
 
