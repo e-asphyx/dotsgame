@@ -10,6 +10,8 @@ import (
 type DBProxy interface {
 	RoomId(uid string) (uint64, error)
 	NewRoom(uid string) (uint64, error)
+	NewPlayer(roomId uint64, cid uint64, scheme string) (uint64, error)
+	GetPlayer(roomId uint64, cid uint64) (uint64, error)
 
 	NewUser(token string) (uint64, error)
 	VerifyToken(token string) (uint64, error)
@@ -46,6 +48,11 @@ func (db *PQProxy) RoomId(uid string) (uint64, error) {
 func (db *PQProxy) NewRoom(uid string) (uint64, error) {
 	var roomId uint64
 	err := db.QueryRow("INSERT INTO room (uid) VALUES ($1) RETURNING id", uid).Scan(&roomId)
+
+	if err != nil {
+		log.Println(err)
+	}
+
 	return roomId, err
 }
 
@@ -170,4 +177,27 @@ func (db *PQProxy) SetAuthToken(cid uint64, token string) error {
 	}
 
 	return err
+}
+
+func (db *PQProxy) NewPlayer(roomId uint64, cid uint64, scheme string) (uint64, error) {
+	var pid uint64
+	err := db.QueryRow("INSERT INTO player (room_id, client_id, color_scheme) " +
+						"VALUES ($1, $2, $3) RETURNING id", roomId, cid, scheme).Scan(&pid)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	return pid, err
+}
+
+func (db *PQProxy) GetPlayer(roomId uint64, cid uint64) (uint64, error) {
+	var pid uint64
+	err := db.QueryRow("SELECT id FROM player WHERE room_id = $1 AND client_id = $2", roomId, cid).Scan(&pid)
+
+	if err != nil && err != sql.ErrNoRows {
+		log.Println(err)
+	}
+
+	return pid, err
 }

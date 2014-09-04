@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 	"io"
-	"strconv"
 	"html/template"
 
 	"code.google.com/p/go.net/websocket"
@@ -29,18 +28,27 @@ type newUserReply struct {
 }
 
 func NewRoom(w http.ResponseWriter, req *http.Request) {
+	cid := GetInjectedValueUint(req, "cid")
 	/* new room */
 	newUid := randStr(6)
 
 	roomId, err := db.NewRoom(newUid)
 
 	if err != nil {
-		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("New room: %s (%d)\n", newUid, roomId)
+	/* First player */
+	/* TODO color scheme */
+	pid, err := db.NewPlayer(roomId, cid, "");
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("New room: %s (%d), first player %d (pid %d)\n", newUid, roomId, cid, pid)
+
 	http.Redirect(w, req, "/" + newUid + "/", http.StatusTemporaryRedirect)
 }
 
@@ -53,7 +61,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err = TokenAuthAuthenticate(w, cid)
+	err = AuthAuthenticate(w, cid)
 
 	if err != nil {
 		log.Println(err)
@@ -79,17 +87,8 @@ func NewUser(req *http.Request) (interface{}, error) {
 	return &reply, nil
 }
 
-func MainServer(w http.ResponseWriter, req *http.Request) {
-	uid := mux.Vars(req)["uid"]
-
-	_, err := db.RoomId(uid)
-	if err != nil {
-		log.Println(err)
-		http.NotFound(w, req)
-		return
-	}
-
-	err = templates.ExecuteTemplate(w, templateMain, nil)
+func RoomServer(w http.ResponseWriter, req *http.Request) {
+	err := templates.ExecuteTemplate(w, templateMain, nil)
     if err != nil {
 		log.Println(err)
         http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -97,21 +96,13 @@ func MainServer(w http.ResponseWriter, req *http.Request) {
 }
 
 func WebSocketServer(ws *websocket.Conn) {
-	uid := mux.Vars(ws.Request())["uid"]
+	cid := GetInjectedValueUint(ws.Request(), "cid")
+	roomId := GetInjectedValueUint(ws.Request(), "room_id")
+	pid := GetInjectedValueUint(ws.Request(), "pid")
 
-	roomId, err := db.RoomId(uid)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+	if cid == 0 || roomId == 0 || pid == 0 {return}
 
-	tmp := ws.Request().FormValue("cid")
-	if tmp == "" {
-		return
-	}
-	cid, _ := strconv.ParseUint(tmp, 10, 0)
-
-	log.Printf("Connected cid %d to room %d (%s)\n", cid, roomId, uid)
+	log.Printf("Connected cid %d to room %d as pid %d\n", cid, roomId, pid)
 
 	/* WebSocket reading wrapper */
 	incoming := make(chan *GameMessage)
@@ -174,11 +165,22 @@ func main() {
 	router.HandleFunc("/login", Login) /* TODO delete this */
 
 	/* Main page */
-	router.Handle("/", &TokenAuthWrapper{handler: http.HandlerFunc(NewRoom)})
-	router.Handle("/{uid}/", &TokenAuthWrapper{handler: http.HandlerFunc(MainServer)})
+	router.Handle("/", NewAuthWrapper(http.HandlerFunc(NewRoom)))
+
+	/* Game room */
+	router.Handle("/{room_id}/", NewAuthWrapper(NewRoomWrapper(http.HandlerFunc(RoomServer))))
+
+	/* Room API */
+	/*
+	router.Path("/{room_id}/api/player").Methods("POST").Handler(&AuthWrapper{handler: http.HandlerFunc(PlayerNew)})
+	router.Path("/{room_id}/api/player").Methods("GET").Handler(&AuthWrapper{handler: http.HandlerFunc(PlayersList)})
+
+	router.Path("/{room_id}/api/player/{id}").Methods("GET").Handler(&AuthWrapper{handler: http.HandlerFunc(PlayerShow)})
+	router.Path("/{room_id}/api/player/{id}").Methods("PUT", "PATCH").Handler(&AuthWrapper{handler: http.HandlerFunc(PlayerUpdate)})
+	*/
 
 	/* Serve WebSocket */
-	router.Handle("/{uid}/websocket", &TokenAuthWrapper{handler: websocket.Handler(WebSocketServer)})
+	router.Handle("/{room_id}/websocket", NewAuthWrapper(NewRoomWrapper(websocket.Handler(WebSocketServer))))
 
 	http.Handle("/", router)
 	/* Start server */
