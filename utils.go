@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
+/*-------------------------------------------------------------------------------*/
 /* custom error interface */
 type HTTPError int
 
@@ -18,6 +19,7 @@ func (err HTTPError) Error() string {
 	return http.StatusText(int(err))
 }
 
+/*-------------------------------------------------------------------------------*/
 /* wrap function into http.Handler iface */
 type JSONHandlerFunc func(*http.Request) (interface{}, error)
 
@@ -44,6 +46,7 @@ func (f JSONHandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_ = enc.Encode(data)
 }
 
+/*-------------------------------------------------------------------------------*/
 func InjectValue(r *http.Request, key string, value string) {
 	_ = r.ParseForm()
 	if r.Form != nil {
@@ -62,6 +65,7 @@ func GetInjectedValueUint(r *http.Request, key string) uint64 {
 	return val
 }
 
+/*-------------------------------------------------------------------------------*/
 type AuthWrapper struct {
 	handler http.Handler
 }
@@ -88,6 +92,28 @@ func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func NewAuthWrapper(handler http.Handler) *AuthWrapper {
 	return &AuthWrapper{handler: handler}
 }
+
+func updateTokenCookie(w http.ResponseWriter, token string) {
+	cookie := http.Cookie {
+		Name: "session_token",
+		Value: token,
+		Path: "/",
+		Expires: time.Now().Add(time.Hour * 24 * 60),
+	}
+	http.SetCookie(w, &cookie)
+}
+
+func AuthAuthenticate(w http.ResponseWriter, cid uint64) error {
+	token := randStr(20)
+
+	err := db.SetAuthToken(cid, token)
+	if err == nil {
+		updateTokenCookie(w, token)
+	}
+	return err
+}
+
+/*-------------------------------------------------------------------------------*/
 
 /* Check if user is in room and injects room id and player id */
 type RoomWrapper struct {
@@ -130,25 +156,7 @@ func NewRoomWrapper(handler http.Handler) *RoomWrapper {
 	return &RoomWrapper{handler: handler}
 }
 
-func updateTokenCookie(w http.ResponseWriter, token string) {
-	cookie := http.Cookie {
-		Name: "session_token",
-		Value: token,
-		Path: "/",
-		Expires: time.Now().Add(time.Hour * 24 * 60),
-	}
-	http.SetCookie(w, &cookie)
-}
-
-func AuthAuthenticate(w http.ResponseWriter, cid uint64) error {
-	token := randStr(20)
-
-	err := db.SetAuthToken(cid, token)
-	if err == nil {
-		updateTokenCookie(w, token)
-	}
-	return err
-}
+/*-------------------------------------------------------------------------------*/
 
 func randStr(n uint) string {
 	buf := make([]byte, n)

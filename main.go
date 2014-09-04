@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"log"
 	"net/http"
 	"io"
@@ -26,6 +27,13 @@ type newUserReply struct {
 	ID uint64 `json:"id"`
 	AuthToken string `json:"token"`
 }
+
+type invitationReply struct {
+	Room string `json:"room"`
+	Code string `json:"code"`
+}
+
+/*-------------------------------------------------------------------------------*/
 
 func NewRoom(w http.ResponseWriter, req *http.Request) {
 	cid := GetInjectedValueUint(req, "cid")
@@ -87,6 +95,25 @@ func NewUser(req *http.Request) (interface{}, error) {
 	return &reply, nil
 }
 
+func RoomInvitation(req *http.Request) (interface{}, error) {
+	roomId := GetInjectedValueUint(req, "room_id")
+	roomUid := mux.Vars(req)["room_id"]
+
+	token := randStr(20)
+
+	id, err := db.NewInvitation(roomId, token)
+	if err != nil {return nil, err}
+
+	log.Printf("New invitation issued: %d\n", id)
+
+	reply := invitationReply {
+		Room: roomUid,
+		Code: token,
+	}
+
+	return &reply, nil
+}
+
 func RoomServer(w http.ResponseWriter, req *http.Request) {
 	err := templates.ExecuteTemplate(w, templateMain, nil)
     if err != nil {
@@ -143,6 +170,8 @@ func WebSocketServer(ws *websocket.Conn) {
 	}
 }
 
+/*-------------------------------------------------------------------------------*/
+
 func main() {
 	log.Println("Start")
 
@@ -171,6 +200,7 @@ func main() {
 	router.Handle("/{room_id}/", NewAuthWrapper(NewRoomWrapper(http.HandlerFunc(RoomServer))))
 
 	/* Room API */
+	router.Path("/{room_id}/api/invitation").Methods("GET").Handler(NewAuthWrapper(NewRoomWrapper(JSONHandlerFunc(RoomInvitation))))
 	/*
 	router.Path("/{room_id}/api/player").Methods("POST").Handler(&AuthWrapper{handler: http.HandlerFunc(PlayerNew)})
 	router.Path("/{room_id}/api/player").Methods("GET").Handler(&AuthWrapper{handler: http.HandlerFunc(PlayersList)})
@@ -184,5 +214,10 @@ func main() {
 
 	http.Handle("/", router)
 	/* Start server */
-	log.Fatal(http.ListenAndServe(":8080", nil))
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Fatal(http.ListenAndServe(":" + port, nil))
 }

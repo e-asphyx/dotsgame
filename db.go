@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"log"
 	"database/sql"
 	"encoding/json"
@@ -21,6 +22,8 @@ type DBProxy interface {
 
 	SetAuthToken(cid uint64, token string) error
 	VerifyAuthToken(token string) (uint64, error)
+
+	NewInvitation(roomId uint64, token string) (uint64, error)
 }
 
 /* PostgreSQL proxy */
@@ -29,7 +32,12 @@ type PQProxy struct {
 }
 
 func NewPQProxy() (*PQProxy, error) {
-	db, err := sql.Open("postgres", "user=asphyx dbname=dotsgame sslmode=disable")
+	url := os.Getenv("DATABASE_URL")
+	if url == "" {
+		url = "user=asphyx dbname=dotsgame sslmode=disable"
+	}
+
+	db, err := sql.Open("postgres", url)
 	if err != nil {return nil, err}
 
 	proxy := &PQProxy {
@@ -200,4 +208,15 @@ func (db *PQProxy) GetPlayer(roomId uint64, cid uint64) (uint64, error) {
 	}
 
 	return pid, err
+}
+
+func (db *PQProxy) NewInvitation(roomId uint64, token string) (uint64, error) {
+	var id uint64
+	err := db.QueryRow("INSERT INTO invitation (room_id, code) VALUES ($1, $2) RETURNING id", roomId, token).Scan(&id)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	return id, err
 }
