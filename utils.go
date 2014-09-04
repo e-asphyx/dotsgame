@@ -75,7 +75,7 @@ func updateTokenCookie(w http.ResponseWriter, token string) {
 		Name: "session_token",
 		Value: token,
 		Path: "/",
-		Expires: time.Now().Add(time.Hour * 24 * 30),
+		Expires: time.Now().Add(time.Hour * 24 * 60),
 	}
 	http.SetCookie(w, &cookie)
 }

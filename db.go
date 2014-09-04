@@ -127,25 +127,47 @@ func (db *PQProxy) LoadHistory(id uint64) (*GameMessage, error) {
 	return &msg, nil
 }
 
+/* login secret */
 func (db *PQProxy) NewUser(token string) (uint64, error) {
 	var cid uint64
 	err := db.QueryRow("INSERT INTO client (auth_token) VALUES ($1) RETURNING id", token).Scan(&cid)
+
+	if err != nil {
+		log.Println(err)
+	}
+
 	return cid, err
 }
 
 func (db *PQProxy) VerifyToken(token string) (uint64, error) {
 	var cid uint64
 	err := db.QueryRow("SELECT id FROM client WHERE auth_token = $1", token).Scan(&cid)
+
+	if err != nil && err != sql.ErrNoRows {
+		log.Println(err)
+	}
+
 	return cid, err
 }
 
+/* session secret (cookie) */
 func (db *PQProxy) VerifyAuthToken(token string) (uint64, error) {
 	var cid uint64
-	err := db.QueryRow("SELECT id FROM client WHERE session_token = $1", token).Scan(&cid)
+	err := db.QueryRow("SELECT cid FROM auth WHERE token = $1 AND CURRENT_TIMESTAMP - timestamp < ttl", token).Scan(&cid)
+
+	if err != nil && err != sql.ErrNoRows {
+		log.Println(err)
+	}
+
 	return cid, err
 }
 
 func (db *PQProxy) SetAuthToken(cid uint64, token string) error {
-	_, err := db.Exec("UPDATE client SET session_token = $1 WHERE id = $2", token, cid)
+	_, err := db.Exec("INSERT INTO auth (cid, token) VALUES ($1, $2)", cid, token)
+
+	if err != nil {
+		log.Println(err)
+	}
+
 	return err
 }
