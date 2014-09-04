@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"io"
+	"time"
 	"html/template"
 
 	"code.google.com/p/go.net/websocket"
@@ -16,6 +17,9 @@ import (
 const (
 	templatesRoot = "templates/"
 	templateMain = "index.html"
+	keepAliveInterval = 30 /* sec */
+
+	FlagKeepAlive = 0x1
 )
 
 var (
@@ -155,17 +159,29 @@ func WebSocketServer(ws *websocket.Conn) {
 	client := room.NewClient(cid)
 	defer client.Cancel()
 
+	timer := time.NewTimer(time.Second * keepAliveInterval)
+
+	keepalive := GameMessage {
+		Flags: FlagKeepAlive,
+	}
 	/* main loop */
 	for {
 		select {
-			case msg, ok := <-incoming:
-				if !ok {return}
-				msg.roomId = roomId
-				room.Post(msg)
+		case msg, ok := <-incoming:
+			if !ok {return}
+			msg.roomId = roomId
+			room.Post(msg)
+			timer.Reset(time.Second * keepAliveInterval)
 
-			case msg := <-client.msg:
-				err := websocket.JSON.Send(ws, msg)
-				if err != nil {return}
+		case msg := <-client.msg:
+			err := websocket.JSON.Send(ws, msg)
+			if err != nil {return}
+			timer.Reset(time.Second * keepAliveInterval)
+
+		case <-timer.C:
+			err := websocket.JSON.Send(ws, &keepalive)
+			if err != nil {return}
+			timer.Reset(time.Second * keepAliveInterval)
 		}
 	}
 }

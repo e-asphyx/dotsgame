@@ -538,7 +538,7 @@ var game = {};
 				}, this);
 			}
 			
-			this.renderGame();
+			if(msg.p || msg.a) this.renderGame();
 		},
 
 		displayAlert: function(msg) {

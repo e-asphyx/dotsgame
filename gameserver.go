@@ -50,10 +50,11 @@ type GamePool struct {
 
 func (srv *GameServer) gameServer() {
 	clients := list.New()
+
 	/* main loop */
 	for {
 		select {
-			case cl, ok := <-srv.add:
+		case cl, ok := <-srv.add:
 			if !ok {return}
 			clients.PushBack(cl)
 
@@ -65,7 +66,7 @@ func (srv *GameServer) gameServer() {
 				cl.msg <- hist
 			}
 
-			case cl := <-srv.remove:
+		case cl := <-srv.remove:
 			for e := clients.Front(); e != nil; e = e.Next() {
 				if e.Value.(*Client) == cl {
 					clients.Remove(e)
@@ -73,7 +74,7 @@ func (srv *GameServer) gameServer() {
 				}
 			}
 
-			case msg := <-srv.msg:
+		case msg := <-srv.msg:
 			/* post history */
 			if err := db.PostHistory(msg); err != nil {
 				log.Printf("db.PostHistory: %s\n", err.Error())
