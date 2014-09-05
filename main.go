@@ -11,7 +11,9 @@ import (
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/context"
 	"code.google.com/p/goauth2/oauth"
+	"github.com/gorilla/sessions"
 )
 
 /*-------------------------------------------------------------------------------*/
@@ -36,7 +38,10 @@ var (
 	}
 
 	db DBProxy
+	store sessions.Store
 )
+
+type contextKey string
 
 type newUserReply struct {
 	ID uint64 `json:"id"`
@@ -51,7 +56,10 @@ type invitationReply struct {
 /*-------------------------------------------------------------------------------*/
 
 func NewRoom(w http.ResponseWriter, req *http.Request) {
-	cid := GetInjectedValueUint(req, "cid")
+	session, _ := store.Get(req, "session")
+
+	cid, _ := session.Values["cid"].(uint64)
+
 	/* new room */
 	newUid := randStr(6)
 
@@ -76,6 +84,8 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 }
 
 func Login(w http.ResponseWriter, req *http.Request) {
+	session, _ := store.Get(req, "session")
+
 	if token := req.FormValue("token"); token != "" {
 		/* Test user login */
 		cid, err := db.VerifyToken(token)
@@ -85,8 +95,10 @@ func Login(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		err = AuthAuthenticate(w, cid)
+		/* Authenticate */
+		session.Values["cid"] = cid
 
+		err = session.Save(req, w)
 		if err != nil {
 			log.Println(err)
 		}
@@ -132,12 +144,14 @@ func NewUser(req *http.Request) (interface{}, error) {
 }
 
 func RoomInvitation(req *http.Request) (interface{}, error) {
-	roomId := GetInjectedValueUint(req, "room_id")
+	roomData, ok := context.Get(req, contextKey("room")).(*RoomData)
+	if !ok {return nil, nil}
+
 	roomUid := mux.Vars(req)["room_id"]
 
 	token := randStr(20)
 
-	id, err := db.NewInvitation(roomId, token)
+	id, err := db.NewInvitation(roomData.roomId, token)
 	if err != nil {return nil, err}
 
 	log.Printf("New invitation issued: %d\n", id)
@@ -159,13 +173,13 @@ func RoomServer(w http.ResponseWriter, req *http.Request) {
 }
 
 func WebSocketServer(ws *websocket.Conn) {
-	cid := GetInjectedValueUint(ws.Request(), "cid")
-	roomId := GetInjectedValueUint(ws.Request(), "room_id")
-	pid := GetInjectedValueUint(ws.Request(), "pid")
+	session, _ := store.Get(ws.Request(), "session")
+	cid, _ := session.Values["cid"].(uint64)
 
-	if cid == 0 || roomId == 0 || pid == 0 {return}
+	roomData, ok := context.Get(ws.Request(), contextKey("room")).(*RoomData)
+	if !ok {return}
 
-	log.Printf("Connected cid %d to room %d as pid %d\n", cid, roomId, pid)
+	log.Printf("Connected cid %d to room %d as pid %d\n", cid, roomData.roomId, roomData.pid)
 
 	/* WebSocket reading wrapper */
 	incoming := make(chan *GameMessage)
@@ -185,7 +199,7 @@ func WebSocketServer(ws *websocket.Conn) {
 		}
 	}()
 
-	room := Pool.Get(roomId)
+	room := Pool.Get(roomData.roomId)
 	defer room.Put()
 
 	client := room.NewClient(cid)
@@ -201,7 +215,7 @@ func WebSocketServer(ws *websocket.Conn) {
 		select {
 		case msg, ok := <-incoming:
 			if !ok {return}
-			msg.roomId = roomId
+			msg.roomId = roomData.roomId
 			room.Post(msg)
 			timer.Reset(time.Second * keepAliveInterval)
 
@@ -221,7 +235,7 @@ func WebSocketServer(ws *websocket.Conn) {
 /*-------------------------------------------------------------------------------*/
 type OAuthRedirect oauth.Config
 
-func (redirect *OAuthRedirect) URL() string {
+func (redirect *OAuthRedirect) String() string {
 	config := (*oauth.Config)(redirect)
 	state := randStr(6)
 
@@ -240,6 +254,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	store = NewDBSessionStore(db)
 
 	router := mux.NewRouter()
 	router.StrictSlash(true)

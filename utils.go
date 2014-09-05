@@ -4,10 +4,9 @@ import (
 	"log"
 	"net/http"
 	"encoding/json"
-	"strconv"
 	"crypto/rand"
 	"encoding/base64"
-	"time"
+	"github.com/gorilla/context"
 
 	"github.com/gorilla/mux"
 )
@@ -22,8 +21,14 @@ func (err HTTPError) Error() string {
 
 /*-------------------------------------------------------------------------------*/
 
-type DynURL interface {
-	URL() string
+type String interface {
+	String() string
+}
+
+type StringVal string
+
+func (val StringVal) String() string {
+	return string(val)
 }
 
 /*-------------------------------------------------------------------------------*/
@@ -54,80 +59,43 @@ func (f JSONHandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 /*-------------------------------------------------------------------------------*/
-func InjectValue(r *http.Request, key string, value string) {
-	_ = r.ParseForm()
-	if r.Form != nil {
-		/* store fake form value */
-		r.Form["_injected_value_" + key] = []string{value}
-	}
-}
-
-func GetInjectedValue(r *http.Request, key string) string {
-	return r.FormValue("_injected_value_" + key)
-}
-
-func GetInjectedValueUint(r *http.Request, key string) uint64 {
-	tmp := GetInjectedValue(r, key)
-	val, _ := strconv.ParseUint(tmp, 10, 0)
-	return val
-}
-
-/*-------------------------------------------------------------------------------*/
 type AuthWrapper struct {
 	Handler http.Handler
-	Redirect DynURL
+	Redirect String
 }
 
 func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	cookie, _ := r.Cookie("session_token")
+	session, _ := store.Get(r, "session")
 
-	if cookie != nil {
-		cid, err := db.VerifyAuthToken(cookie.Value);
+	_, ok := session.Values["cid"].(uint64)
 
-		if err == nil {
-			InjectValue(r, "cid", strconv.FormatUint(cid, 10))
-			updateTokenCookie(w, cookie.Value)
+	if ok {
+		/* handle */
+		/* TODO update cookie expired time */
 
-			/* handle */
-			wrapper.Handler.ServeHTTP(w, r)
-			return
-		}
+		wrapper.Handler.ServeHTTP(w, r)
+		return
 	}
 
 	/* redirect to login dialog */
 	if wrapper.Redirect != nil {
-		http.Redirect(w, r, wrapper.Redirect.URL(), http.StatusTemporaryRedirect)
+		http.Redirect(w, r, wrapper.Redirect.String(), http.StatusTemporaryRedirect)
 		return
 	}
 
 	http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 }
 
-func NewAuthWrapper(handler http.Handler, redirect DynURL) *AuthWrapper {
+func NewAuthWrapper(handler http.Handler, redirect String) *AuthWrapper {
 	return &AuthWrapper{Handler: handler, Redirect: redirect}
 }
 
-func updateTokenCookie(w http.ResponseWriter, token string) {
-	cookie := http.Cookie {
-		Name: "session_token",
-		Value: token,
-		Path: "/",
-		Expires: time.Now().Add(time.Hour * 24 * 60),
-	}
-	http.SetCookie(w, &cookie)
-}
-
-func AuthAuthenticate(w http.ResponseWriter, cid uint64) error {
-	token := randStr(20)
-
-	err := db.SetAuthToken(cid, token)
-	if err == nil {
-		updateTokenCookie(w, token)
-	}
-	return err
-}
-
 /*-------------------------------------------------------------------------------*/
+
+type RoomData struct {
+	roomId uint64
+	pid uint64
+}
 
 /* Check if user is in room and injects room id and player id */
 type RoomWrapper struct {
@@ -135,9 +103,10 @@ type RoomWrapper struct {
 }
 
 func (wrapper *RoomWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "session")
+	cid, ok := session.Values["cid"].(uint64)
 
-	cid := GetInjectedValueUint(r, "cid")
-	if cid == 0 {
+	if !ok {
 		http.Error(w, http.StatusText(http.StatusForbidden) + " (bad cid)", http.StatusForbidden)
 		return
 	}
@@ -150,19 +119,23 @@ func (wrapper *RoomWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	roomId, err := db.RoomId(uid)
 	if err != nil {
-		http.Error(w, http.StatusText(http.StatusNotFound) + " (bad pid)", http.StatusNotFound)
+		http.Error(w, http.StatusText(http.StatusNotFound) + " (bad room_id)", http.StatusNotFound)
 		return
 	}
-	InjectValue(r, "room_id", strconv.FormatUint(roomId, 10))
 
 	pid, err := db.GetPlayer(roomId, cid)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 		return
 	}
-	InjectValue(r, "pid", strconv.FormatUint(pid, 10))
 
-	/* handle here */
+	rd := RoomData {
+		roomId: roomId,
+		pid: pid,
+	}
+	context.Set(r, contextKey("room"), &rd)
+
+	// handle here
 	wrapper.handler.ServeHTTP(w, r)
 }
 

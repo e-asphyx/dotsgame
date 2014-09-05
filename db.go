@@ -20,8 +20,8 @@ type DBProxy interface {
 	PostHistory(msg *GameMessage) error
 	LoadHistory(id uint64) (*GameMessage, error)
 
-	SetAuthToken(cid uint64, token string) error
-	VerifyAuthToken(token string) (uint64, error)
+	LoadSession(sid string, name string) (string, error)
+	SaveSession(sid string, name string, data string) error
 
 	NewInvitation(roomId uint64, token string) (uint64, error)
 }
@@ -165,28 +165,6 @@ func (db *PQProxy) VerifyToken(token string) (uint64, error) {
 	return cid, err
 }
 
-/* session secret (cookie) */
-func (db *PQProxy) VerifyAuthToken(token string) (uint64, error) {
-	var cid uint64
-	err := db.QueryRow("SELECT cid FROM auth WHERE token = $1 AND CURRENT_TIMESTAMP - timestamp < ttl", token).Scan(&cid)
-
-	if err != nil && err != sql.ErrNoRows {
-		log.Println(err)
-	}
-
-	return cid, err
-}
-
-func (db *PQProxy) SetAuthToken(cid uint64, token string) error {
-	_, err := db.Exec("INSERT INTO auth (cid, token) VALUES ($1, $2)", cid, token)
-
-	if err != nil {
-		log.Println(err)
-	}
-
-	return err
-}
-
 func (db *PQProxy) NewPlayer(roomId uint64, cid uint64, scheme string) (uint64, error) {
 	var pid uint64
 	err := db.QueryRow("INSERT INTO player (room_id, client_id, color_scheme) " +
@@ -219,4 +197,25 @@ func (db *PQProxy) NewInvitation(roomId uint64, token string) (uint64, error) {
 	}
 
 	return id, err
+}
+
+func (db *PQProxy) LoadSession(sid string, name string) (string, error) {
+	var data string
+	err := db.QueryRow("SELECT data FROM session WHERE sid = $1 AND name = $2 AND CURRENT_TIMESTAMP - timestamp < ttl", sid, name).Scan(&data)
+
+	if err != nil && err != sql.ErrNoRows {
+		log.Println(err)
+	}
+
+	return data, err
+}
+
+func (db *PQProxy) SaveSession(sid string, name string, data string) error {
+	_, err := db.Exec("INSERT INTO session (sid, name, data) VALUES ($1, $2, $3)", sid, name, data)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	return err
 }
