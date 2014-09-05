@@ -214,6 +214,7 @@ func (db *PQProxy) SaveSession(sid string, name string, data string) error {
 	_, err := db.Exec("INSERT INTO session (sid, name, data) VALUES ($1, $2, $3)", sid, name, data)
 
 	if err != nil {
+		log.Println(data)
 		log.Println(err)
 	}
 
