@@ -61,8 +61,6 @@ type AuthWrapper struct {
 func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "session")
 
-	log.Println(session.Values)
-
 	cid, ok := getUint64(session.Values["cid"])
 	if !ok {
 		/* redirect to login dialog */
