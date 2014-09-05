@@ -211,10 +211,18 @@ func (db *PQProxy) LoadSession(sid string, name string) (string, error) {
 }
 
 func (db *PQProxy) SaveSession(sid string, name string, data string) error {
-	_, err := db.Exec("INSERT INTO session (sid, name, data) VALUES ($1, $2, $3)", sid, name, data)
-
+	res, err := db.Exec("UPDATE session SET data = $1, timestamp = DEFAULT WHERE sid = $2 AND name = $3", data, sid, name)
 	if err != nil {
 		log.Println("SaveSession: ", err)
+		return err
+	}
+
+	if affected, _ := res.RowsAffected(); affected == 0 {
+		_, err = db.Exec("INSERT INTO session (sid, name, data) VALUES ($1, $2, $3)", sid, name, data)
+
+		if err != nil {
+			log.Println("SaveSession: ", err)
+		}
 	}
 
 	return err

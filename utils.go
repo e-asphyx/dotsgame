@@ -21,14 +21,8 @@ func (err HTTPError) Error() string {
 
 /*-------------------------------------------------------------------------------*/
 
-type String interface {
-	String() string
-}
-
-type StringVal string
-
-func (val StringVal) String() string {
-	return string(val)
+type Redirector interface {
+	Redirect(w http.ResponseWriter, r *http.Request) error
 }
 
 /*-------------------------------------------------------------------------------*/
@@ -61,7 +55,7 @@ func (f JSONHandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 /*-------------------------------------------------------------------------------*/
 type AuthWrapper struct {
 	Handler http.Handler
-	Redirect String
+	Redirect Redirector
 }
 
 func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -79,14 +73,14 @@ func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	/* redirect to login dialog */
 	if wrapper.Redirect != nil {
-		http.Redirect(w, r, wrapper.Redirect.String(), http.StatusTemporaryRedirect)
+		wrapper.Redirect.Redirect(w, r)
 		return
 	}
 
 	http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 }
 
-func NewAuthWrapper(handler http.Handler, redirect String) *AuthWrapper {
+func NewAuthWrapper(handler http.Handler, redirect Redirector) *AuthWrapper {
 	return &AuthWrapper{Handler: handler, Redirect: redirect}
 }
 
@@ -104,6 +98,7 @@ type RoomWrapper struct {
 
 func (wrapper *RoomWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "session")
+
 	cid, ok := session.Values["cid"].(uint64)
 
 	if !ok {

@@ -84,8 +84,6 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 }
 
 func Login(w http.ResponseWriter, req *http.Request) {
-	session, _ := store.Get(req, "session")
-
 	if token := req.FormValue("token"); token != "" {
 		/* Test user login */
 		cid, err := db.VerifyToken(token)
@@ -96,6 +94,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		}
 
 		/* Authenticate */
+		session, _ := store.New(req, "session")
 		session.Values["cid"] = cid
 
 		err = session.Save(req, w)
@@ -109,6 +108,22 @@ func Login(w http.ResponseWriter, req *http.Request) {
 
 	/* OAuth2 login */
 	if code := req.FormValue("code"); code != "" {
+		var state string
+		if state = req.FormValue("state"); state == "" {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+
+		session, _ := store.Get(req, "session")
+
+		newstate, ok := session.Values["state"].(string)
+		if !ok || state != newstate {
+			log.Printf("%s != %s\n", state, newstate);
+
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+
 		transport := &oauth.Transport{Config: oauthConfig}
 		tok, err := transport.Exchange(code)
 
@@ -235,13 +250,21 @@ func WebSocketServer(ws *websocket.Conn) {
 /*-------------------------------------------------------------------------------*/
 type OAuthRedirect oauth.Config
 
-func (redirect *OAuthRedirect) String() string {
+func (redirect *OAuthRedirect) Redirect(w http.ResponseWriter, r *http.Request) error {
 	config := (*oauth.Config)(redirect)
 	state := randStr(6)
 
-	/* TODO save in db */
+	session, _ := store.Get(r, "session")
+	session.Values["state"] = state
+	err := session.Save(r, w)
 
-	return config.AuthCodeURL(state)
+	if err != nil {
+		log.Println(err)
+	}
+
+	http.Redirect(w, r, config.AuthCodeURL(state), http.StatusTemporaryRedirect)
+
+	return nil
 }
 
 /*-------------------------------------------------------------------------------*/
