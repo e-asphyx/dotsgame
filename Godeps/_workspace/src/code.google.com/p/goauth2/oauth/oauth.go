@@ -423,10 +423,10 @@ func (t *Transport) updateToken(tok *Token, v url.Values) error {
 	}
 	defer r.Body.Close()
 	if r.StatusCode != 200 {
-		return OAuthError{"updateToken", "Unexpected HTTP status " + r.Status}
-
 		body, _ := ioutil.ReadAll(r.Body)
 		log.Println(body)
+		return OAuthError{"updateToken", "Unexpected HTTP status " + r.Status}
+
 	}
 	var b struct {
 		Access    string `json:"access_token"`
