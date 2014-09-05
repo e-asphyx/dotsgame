@@ -52,7 +52,16 @@ func (s *DBSessionStore) Save(r *http.Request, w http.ResponseWriter, session *s
 func (s *DBSessionStore) load(session *sessions.Session) error {
 	data, err := s.db.LoadSession(session.ID, session.Name())
 	if err == nil {
-		err = json.Unmarshal([]byte(data), &session.Values)
+		tmp := make(map[string]interface{})
+
+		err = json.Unmarshal([]byte(data), &tmp)
+		if err == nil {
+			for key, value := range tmp {
+				session.Values[key] = value
+			}
+		}
+
+		//err = json.Unmarshal([]byte(data), &session.Values)
 
 		log.Println("load: ", session.Values)
 
