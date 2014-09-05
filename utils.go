@@ -63,7 +63,7 @@ func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	log.Println(session.Values)
 
-	cid, ok := session.Values["cid"].(uint64)
+	cid, ok := getUint64(session.Values["cid"])
 	if !ok {
 		/* redirect to login dialog */
 		if wrapper.Redirect != nil {
@@ -115,3 +115,28 @@ func randStr(n uint) string {
     return base64.URLEncoding.EncodeToString(buf)
 }
 
+func getUint64 (v interface{}) (uint64, bool) {
+	var ret uint64
+
+	switch val := v.(type) {
+	default:
+		return 0, false
+
+	case int:
+		ret = uint64(val)
+
+	case int64:
+		ret = uint64(val)
+
+	case uint:
+		ret = uint64(val)
+
+	case uint64:
+		ret = uint64(val)
+
+	case float64:
+		ret = uint64(val)
+	}
+
+	return ret, true
+}

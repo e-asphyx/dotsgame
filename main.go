@@ -56,7 +56,7 @@ type invitationReply struct {
 func NewRoom(w http.ResponseWriter, req *http.Request) {
 	session, _ := store.Get(req, "session")
 
-	cid, _ := session.Values["cid"].(uint64)
+	cid, _ := getUint64(session.Values["cid"])
 
 	/* new room */
 	newUid := randStr(6)
@@ -184,7 +184,7 @@ func RoomServer(w http.ResponseWriter, req *http.Request) {
 func WebSocketServer(ws *websocket.Conn) {
 	session, _ := store.Get(ws.Request(), "session")
 
-	cid, _ := session.Values["cid"].(uint64)
+	cid, _ := getUint64(session.Values["cid"])
 	roomId, _ := context.Get(ws.Request(), "room_id").(uint64)
 	pid, _ := context.Get(ws.Request(), "player_id").(uint64)
 
