@@ -52,20 +52,14 @@ func (s *DBSessionStore) Save(r *http.Request, w http.ResponseWriter, session *s
 func (s *DBSessionStore) load(session *sessions.Session) error {
 	data, err := s.db.LoadSession(session.ID, session.Name())
 	if err == nil {
+		/* JSON accepts only string keys */
 		tmp := make(map[string]interface{})
 
-		err = json.Unmarshal([]byte(data), &tmp)
-		if err == nil {
+		if err = json.Unmarshal([]byte(data), &tmp); err == nil {
 			for key, value := range tmp {
 				session.Values[key] = value
 			}
-		}
-
-		//err = json.Unmarshal([]byte(data), &session.Values)
-
-		log.Println("load: ", session.Values)
-
-		if err != nil {
+		} else {
 			log.Println(err)
 		}
 	}
@@ -74,8 +68,7 @@ func (s *DBSessionStore) load(session *sessions.Session) error {
 }
 
 func (s *DBSessionStore) save(session *sessions.Session) error {
-	log.Println("save: ", session.Values)
-
+	/* JSON accepts only string keys */
 	tmp := make(map[string]interface{})
 
 	for key, value := range session.Values {
