@@ -41,8 +41,6 @@ var (
 	store sessions.Store
 )
 
-type contextKey string
-
 type newUserReply struct {
 	ID uint64 `json:"id"`
 	AuthToken string `json:"token"`
@@ -159,20 +157,16 @@ func NewUser(req *http.Request) (interface{}, error) {
 }
 
 func RoomInvitation(req *http.Request) (interface{}, error) {
-	roomData, ok := context.Get(req, contextKey("room")).(*RoomData)
-	if !ok {return nil, nil}
-
-	roomUid := mux.Vars(req)["room_id"]
-
+	roomId, _ := context.Get(req, "room_id").(uint64)
 	token := randStr(20)
 
-	id, err := db.NewInvitation(roomData.roomId, token)
+	id, err := db.NewInvitation(roomId, token)
 	if err != nil {return nil, err}
 
 	log.Printf("New invitation issued: %d\n", id)
 
 	reply := invitationReply {
-		Room: roomUid,
+		Room: mux.Vars(req)["room_id"],
 		Code: token,
 	}
 
@@ -189,12 +183,12 @@ func RoomServer(w http.ResponseWriter, req *http.Request) {
 
 func WebSocketServer(ws *websocket.Conn) {
 	session, _ := store.Get(ws.Request(), "session")
+
 	cid, _ := session.Values["cid"].(uint64)
+	roomId, _ := context.Get(ws.Request(), "room_id").(uint64)
+	pid, _ := context.Get(ws.Request(), "player_id").(uint64)
 
-	roomData, ok := context.Get(ws.Request(), contextKey("room")).(*RoomData)
-	if !ok {return}
-
-	log.Printf("Connected cid %d to room %d as pid %d\n", cid, roomData.roomId, roomData.pid)
+	log.Printf("Connected cid %d to room %d as pid %d\n", cid, roomId, pid)
 
 	/* WebSocket reading wrapper */
 	incoming := make(chan *GameMessage)
@@ -214,7 +208,7 @@ func WebSocketServer(ws *websocket.Conn) {
 		}
 	}()
 
-	room := Pool.Get(roomData.roomId)
+	room := Pool.Get(roomId)
 	defer room.Put()
 
 	client := room.NewClient(cid)
@@ -230,7 +224,7 @@ func WebSocketServer(ws *websocket.Conn) {
 		select {
 		case msg, ok := <-incoming:
 			if !ok {return}
-			msg.roomId = roomData.roomId
+			msg.roomId = roomId
 			room.Post(msg)
 			timer.Reset(time.Second * keepAliveInterval)
 
@@ -296,14 +290,14 @@ func main() {
 	router.Handle("/", NewAuthWrapper(http.HandlerFunc(NewRoom), (*OAuthRedirect)(oauthConfig)))
 
 	/* Game room */
-	router.Handle("/{room_id}/", NewAuthWrapper(NewRoomWrapper(http.HandlerFunc(RoomServer)), (*OAuthRedirect)(oauthConfig)))
+	router.Handle("/{room_id}/", NewAuthWrapper(http.HandlerFunc(RoomServer), (*OAuthRedirect)(oauthConfig)))
 
 	/* Room API */
-	router.Path("/{room_id}/api/invitation").Methods("GET").Handler(NewAuthWrapper(NewRoomWrapper(JSONHandlerFunc(RoomInvitation)),
+	router.Path("/{room_id}/api/invitation").Methods("GET").Handler(NewAuthWrapper(JSONHandlerFunc(RoomInvitation),
 																					(*OAuthRedirect)(oauthConfig)))
 
 	/* Serve WebSocket */
-	router.Handle("/{room_id}/websocket", NewAuthWrapper(NewRoomWrapper(websocket.Handler(WebSocketServer)), (*OAuthRedirect)(oauthConfig)))
+	router.Handle("/{room_id}/websocket", NewAuthWrapper(websocket.Handler(WebSocketServer), (*OAuthRedirect)(oauthConfig)))
 
 	http.Handle("/", router)
 	/* Start server */

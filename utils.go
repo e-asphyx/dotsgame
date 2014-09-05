@@ -61,81 +61,48 @@ type AuthWrapper struct {
 func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "session")
 
-	_, ok := session.Values["cid"].(uint64)
-
-	if ok {
-		/* handle */
-		/* TODO update cookie expired time */
-
-		wrapper.Handler.ServeHTTP(w, r)
-		return
-	}
-
-	/* redirect to login dialog */
-	if wrapper.Redirect != nil {
-		wrapper.Redirect.Redirect(w, r)
-		return
-	}
-
-	http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-}
-
-func NewAuthWrapper(handler http.Handler, redirect Redirector) *AuthWrapper {
-	return &AuthWrapper{Handler: handler, Redirect: redirect}
-}
-
-/*-------------------------------------------------------------------------------*/
-
-type RoomData struct {
-	roomId uint64
-	pid uint64
-}
-
-/* Check if user is in room and injects room id and player id */
-type RoomWrapper struct {
-	handler http.Handler
-}
-
-func (wrapper *RoomWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	session, _ := store.Get(r, "session")
-
 	cid, ok := session.Values["cid"].(uint64)
-
 	if !ok {
-		http.Error(w, http.StatusText(http.StatusForbidden) + " (bad cid)", http.StatusForbidden)
-		return
-	}
+		/* redirect to login dialog */
+		if wrapper.Redirect != nil {
+			wrapper.Redirect.Redirect(w, r)
+			return
+		}
 
-	uid := mux.Vars(r)["room_id"]
-	if uid == "" {
-		http.Error(w, http.StatusText(http.StatusBadRequest) + " (bad room_id)", http.StatusBadRequest)
-		return
-	}
-
-	roomId, err := db.RoomId(uid)
-	if err != nil {
-		http.Error(w, http.StatusText(http.StatusNotFound) + " (bad room_id)", http.StatusNotFound)
-		return
-	}
-
-	pid, err := db.GetPlayer(roomId, cid)
-	if err != nil {
 		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 		return
 	}
 
-	rd := RoomData {
-		roomId: roomId,
-		pid: pid,
-	}
-	context.Set(r, contextKey("room"), &rd)
+	uid := mux.Vars(r)["room_id"]
+	if uid != "" {
+		/* Authenticate user in given room */
+		roomId, err := db.RoomId(uid)
 
-	// handle here
-	wrapper.handler.ServeHTTP(w, r)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
+
+		pid, err := db.GetPlayer(roomId, cid)
+
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+
+		context.Set(r, "room_id", roomId)
+		context.Set(r, "player_id", pid)
+	}
+
+	/* handle */
+	/* TODO update cookie expiration date */
+
+	wrapper.Handler.ServeHTTP(w, r)
+
 }
 
-func NewRoomWrapper(handler http.Handler) *RoomWrapper {
-	return &RoomWrapper{handler: handler}
+func NewAuthWrapper(handler http.Handler, redirect Redirector) *AuthWrapper {
+	return &AuthWrapper{Handler: handler, Redirect: redirect}
 }
 
 /*-------------------------------------------------------------------------------*/
