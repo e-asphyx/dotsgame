@@ -72,7 +72,7 @@ func (s *DBSessionStore) save(session *sessions.Session) error {
 	for key, value := range session.Values {
 		strkey, ok := key.(string)
 		if ok {
-			tmp[key] = value
+			tmp[strkey] = value
 		}
 	}
 
