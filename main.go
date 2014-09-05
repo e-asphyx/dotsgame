@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"log"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/gorilla/mux"
+	"code.google.com/p/goauth2/oauth"
 )
 
 /*-------------------------------------------------------------------------------*/
@@ -24,6 +26,16 @@ const (
 
 var (
 	templates = template.Must(template.ParseFiles(templatesRoot + templateMain))
+	oauthConfig = &oauth.Config {
+		ClientId:     os.Getenv("FB_ID"),
+		ClientSecret: os.Getenv("FB_SECRET"), /* Come from Heroku app config */
+
+		Scope:        "public_profile",
+		AuthURL:      "https://www.facebook.com/dialog/oauth",
+		TokenURL:     "https://graph.facebook.com/oauth/access_token",
+		RedirectURL:  "http://dotsgame.herokuapp.com/login",
+	}
+
 	db DBProxy
 )
 
@@ -65,22 +77,43 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 }
 
 func Login(w http.ResponseWriter, req *http.Request) {
-	token := req.FormValue("token")
-	cid, err := db.VerifyToken(token)
+	if token := req.FormValue("token"); token != "" {
+		/* Test user login */
+		cid, err := db.VerifyToken(token)
 
-	if err != nil {
-		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+
+		err = AuthAuthenticate(w, cid)
+
+		if err != nil {
+			log.Println(err)
+		}
+
+		log.Printf("User %d logged in\n", cid)
 		return
 	}
 
-	err = AuthAuthenticate(w, cid)
+	/* OAuth2 login */
+	if code := req.FormValue("code"); code != "" {
+		transport := &oauth.Transport{Config: oauthConfig}
+		tok, err := transport.Exchange(code)
 
-	if err != nil {
-		log.Println(err)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+
+		fmt.Fprintln(w, "Done!")
+		log.Println(tok)
+
 		return
 	}
 
-	log.Printf("User %d logged in\n", cid)
+	http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 }
 
 func NewUser(req *http.Request) (interface{}, error) {
@@ -187,6 +220,18 @@ func WebSocketServer(ws *websocket.Conn) {
 }
 
 /*-------------------------------------------------------------------------------*/
+type OAuthRedirect oauth.Config
+
+func (redirect *OAuthRedirect) URL() string {
+	config := (*oauth.Config)(redirect)
+	state := randStr(6)
+
+	/* TODO save in db */
+
+	return config.AuthCodeURL(state)
+}
+
+/*-------------------------------------------------------------------------------*/
 
 func main() {
 	log.Println("Start")
@@ -207,26 +252,20 @@ func main() {
 	router.Handle("/api/newuser", JSONHandlerFunc(NewUser)) /* TODO delete this */
 
 	/* token login */
-	router.HandleFunc("/login", Login) /* TODO delete this */
+	router.HandleFunc("/login", Login)
 
 	/* Main page */
-	router.Handle("/", NewAuthWrapper(http.HandlerFunc(NewRoom)))
+	router.Handle("/", NewAuthWrapper(http.HandlerFunc(NewRoom), (*OAuthRedirect)(oauthConfig)))
 
 	/* Game room */
-	router.Handle("/{room_id}/", NewAuthWrapper(NewRoomWrapper(http.HandlerFunc(RoomServer))))
+	router.Handle("/{room_id}/", NewAuthWrapper(NewRoomWrapper(http.HandlerFunc(RoomServer)), (*OAuthRedirect)(oauthConfig)))
 
 	/* Room API */
-	router.Path("/{room_id}/api/invitation").Methods("GET").Handler(NewAuthWrapper(NewRoomWrapper(JSONHandlerFunc(RoomInvitation))))
-	/*
-	router.Path("/{room_id}/api/player").Methods("POST").Handler(&AuthWrapper{handler: http.HandlerFunc(PlayerNew)})
-	router.Path("/{room_id}/api/player").Methods("GET").Handler(&AuthWrapper{handler: http.HandlerFunc(PlayersList)})
-
-	router.Path("/{room_id}/api/player/{id}").Methods("GET").Handler(&AuthWrapper{handler: http.HandlerFunc(PlayerShow)})
-	router.Path("/{room_id}/api/player/{id}").Methods("PUT", "PATCH").Handler(&AuthWrapper{handler: http.HandlerFunc(PlayerUpdate)})
-	*/
+	router.Path("/{room_id}/api/invitation").Methods("GET").Handler(NewAuthWrapper(NewRoomWrapper(JSONHandlerFunc(RoomInvitation)),
+																					(*OAuthRedirect)(oauthConfig)))
 
 	/* Serve WebSocket */
-	router.Handle("/{room_id}/websocket", NewAuthWrapper(NewRoomWrapper(websocket.Handler(WebSocketServer))))
+	router.Handle("/{room_id}/websocket", NewAuthWrapper(NewRoomWrapper(websocket.Handler(WebSocketServer)), (*OAuthRedirect)(oauthConfig)))
 
 	http.Handle("/", router)
 	/* Start server */

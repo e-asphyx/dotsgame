@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"time"
+
 	"github.com/gorilla/mux"
 )
 
@@ -17,6 +18,12 @@ type HTTPError int
 
 func (err HTTPError) Error() string {
 	return http.StatusText(int(err))
+}
+
+/*-------------------------------------------------------------------------------*/
+
+type DynURL interface {
+	URL() string
 }
 
 /*-------------------------------------------------------------------------------*/
@@ -67,7 +74,8 @@ func GetInjectedValueUint(r *http.Request, key string) uint64 {
 
 /*-------------------------------------------------------------------------------*/
 type AuthWrapper struct {
-	handler http.Handler
+	Handler http.Handler
+	Redirect DynURL
 }
 
 func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -81,16 +89,22 @@ func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			updateTokenCookie(w, cookie.Value)
 
 			/* handle */
-			wrapper.handler.ServeHTTP(w, r)
+			wrapper.Handler.ServeHTTP(w, r)
 			return
 		}
+	}
+
+	/* redirect to login dialog */
+	if wrapper.Redirect != nil {
+		http.Redirect(w, r, wrapper.Redirect.URL(), http.StatusTemporaryRedirect)
+		return
 	}
 
 	http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 }
 
-func NewAuthWrapper(handler http.Handler) *AuthWrapper {
-	return &AuthWrapper{handler: handler}
+func NewAuthWrapper(handler http.Handler, redirect DynURL) *AuthWrapper {
+	return &AuthWrapper{Handler: handler, Redirect: redirect}
 }
 
 func updateTokenCookie(w http.ResponseWriter, token string) {
