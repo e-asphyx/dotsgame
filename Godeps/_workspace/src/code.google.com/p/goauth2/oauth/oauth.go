@@ -50,6 +50,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"log"
 )
 
 // OAuthError is the error type returned by many operations.
@@ -423,6 +424,9 @@ func (t *Transport) updateToken(tok *Token, v url.Values) error {
 	defer r.Body.Close()
 	if r.StatusCode != 200 {
 		return OAuthError{"updateToken", "Unexpected HTTP status " + r.Status}
+
+		body, _ := ioutil.ReadAll(r.Body)
+		log.Println(body)
 	}
 	var b struct {
 		Access    string `json:"access_token"`
