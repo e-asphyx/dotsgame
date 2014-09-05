@@ -30,7 +30,6 @@ var (
 		ClientId:     os.Getenv("FB_ID"),
 		ClientSecret: os.Getenv("FB_SECRET"), /* Come from Heroku app config */
 
-		Scope:        "public_profile",
 		AuthURL:      "https://www.facebook.com/dialog/oauth",
 		TokenURL:     "https://graph.facebook.com/oauth/access_token",
 		RedirectURL:  "http://dotsgame.herokuapp.com/login",
