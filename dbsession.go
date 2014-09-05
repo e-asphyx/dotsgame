@@ -53,7 +53,9 @@ func (s *DBSessionStore) load(session *sessions.Session) error {
 	data, err := s.db.LoadSession(session.ID, session.Name())
 	if err == nil {
 		err = json.Unmarshal([]byte(data), &session.Values)
-		log.Println(session.Values)
+
+		log.Println("load: ", session.Values)
+
 		if err != nil {
 			log.Println(err)
 		}
@@ -63,6 +65,7 @@ func (s *DBSessionStore) load(session *sessions.Session) error {
 }
 
 func (s *DBSessionStore) save(session *sessions.Session) error {
+	log.Println("save: ", session.Values)
 	data, _ := json.Marshal(session.Values)
 
 	return s.db.SaveSession(session.ID, session.Name(), string(data))
