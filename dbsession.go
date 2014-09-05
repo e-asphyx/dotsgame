@@ -66,7 +66,17 @@ func (s *DBSessionStore) load(session *sessions.Session) error {
 
 func (s *DBSessionStore) save(session *sessions.Session) error {
 	log.Println("save: ", session.Values)
-	data, _ := json.Marshal(session.Values)
+
+	tmp := make(map[string]interface{})
+
+	for key, value := range session.Values {
+		strkey, ok := key.(string)
+		if ok {
+			tmp[key] = value
+		}
+	}
+
+	data, _ := json.Marshal(tmp)
 
 	return s.db.SaveSession(session.ID, session.Name(), string(data))
 }
