@@ -233,7 +233,7 @@ func (db *PQProxy) SaveSession(sid string, name string, data string) error {
 }
 
 func (db *PQProxy) SyncUser(cid uint64, name, picture, token string, expires time.Time) error {
-	res, err := db.Exec("UPDATE client SET name = $1, picture = $2, token = $3, expires = $4 WHERE id = $5",
+	res, err := db.Exec("UPDATE client SET name = $1, picture = $2, access_token = $3, expires = $4 WHERE id = $5",
 						name, picture, token, expires, cid)
 
 	if err != nil {
@@ -242,7 +242,7 @@ func (db *PQProxy) SyncUser(cid uint64, name, picture, token string, expires tim
 	}
 
 	if affected, _ := res.RowsAffected(); affected == 0 {
-		_, err = db.Exec("INSERT INTO client (id, name, picture, token, expires) VALUES ($1, $2, $3, $4, $5)",
+		_, err = db.Exec("INSERT INTO client (id, name, picture, access_token, expires) VALUES ($1, $2, $3, $4, $5)",
 						cid, name, picture, token, expires)
 
 		if err != nil {
