@@ -75,7 +75,7 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 	/* TODO color scheme */
 	pid, err := db.NewPlayer(roomId, cid, "");
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
