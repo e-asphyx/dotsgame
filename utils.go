@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strconv"
 	"net/http"
 	"encoding/json"
 	"crypto/rand"
@@ -134,6 +135,9 @@ func getUint64 (v interface{}) (uint64, bool) {
 
 	case float64:
 		ret = uint64(val)
+
+	case string:
+		ret, _ = strconv.ParseUint(val, 10, 0)
 	}
 
 	return ret, true

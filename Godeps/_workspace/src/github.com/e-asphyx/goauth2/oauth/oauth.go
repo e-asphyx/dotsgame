@@ -425,10 +425,11 @@ func (t *Transport) updateToken(tok *Token, v url.Values) error {
 		return OAuthError{"updateToken", "Unexpected HTTP status " + r.Status}
 	}
 	var b struct {
-		Access    string `json:"access_token"`
-		Refresh   string `json:"refresh_token"`
-		ExpiresIn int64  `json:"expires_in"` // seconds
-		Id        string `json:"id_token"`
+		Access      string `json:"access_token"`
+		Refresh     string `json:"refresh_token"`
+		ExpiresIn   int64  `json:"expires_in"` // seconds
+		ExpiresInFb int64  `json:"expires"` // Facebook returns this
+		Id          string `json:"id_token"`
 	}
 
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
@@ -444,14 +445,22 @@ func (t *Transport) updateToken(tok *Token, v url.Values) error {
 			return err
 		}
 
+		expires := vals.Get("expires_in")
+		if expires == "" {
+			expires = vals.Get("expires")
+		}
+
 		b.Access = vals.Get("access_token")
 		b.Refresh = vals.Get("refresh_token")
-		b.ExpiresIn, _ = strconv.ParseInt(vals.Get("expires_in"), 10, 64)
+		b.ExpiresIn, _ = strconv.ParseInt(expires, 10, 64)
 		b.Id = vals.Get("id_token")
 	default:
 		if err = json.Unmarshal(body, &b); err != nil {
 			return fmt.Errorf("got bad response from server: %q", body)
 		}
+	}
+	if b.ExpiresIn == 0 {
+		b.ExpiresIn = b.ExpiresInFb
 	}
 	if b.Access == "" {
 		return errors.New("received empty access token from authorization server")

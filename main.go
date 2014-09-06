@@ -12,7 +12,7 @@ import (
 	"code.google.com/p/go.net/websocket"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/context"
-	"code.google.com/p/goauth2/oauth"
+	"github.com/e-asphyx/goauth2/oauth"
 	"github.com/gorilla/sessions"
 )
 
