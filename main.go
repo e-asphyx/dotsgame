@@ -8,6 +8,7 @@ import (
 	"io"
 	"time"
 	"html/template"
+	"strconv"
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/gorilla/mux"
@@ -23,6 +24,9 @@ const (
 	keepAliveInterval = 30 /* sec */
 
 	FlagKeepAlive = 0x1
+
+	GraphAPIProfile = "https://graph.facebook.com/v2.1/me"
+	GraphAPIPicture = "https://graph.facebook.com/v2.1/me/picture?type=normal&redirect=false"
 )
 
 var (
@@ -122,7 +126,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		}
 
 		transport := &oauth.Transport{Config: oauthConfig}
-		_, err := transport.Exchange(code)
+		tok, err := transport.Exchange(code)
 
 		if err != nil {
 			log.Println(err)
@@ -136,7 +140,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 			Name string `json:"name"`
 		}
 
-		err = OAuthCall(transport, "https://graph.facebook.com/v2.1/me", &profile)
+		err = OAuthCall(transport, GraphAPIProfile, &profile)
 		if err != nil {
 			log.Println(err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -150,15 +154,29 @@ func Login(w http.ResponseWriter, req *http.Request) {
 			} `json:"data"`
 		}
 
-		err = OAuthCall(transport, "https://graph.facebook.com/v2.1/me/picture?type=normal&redirect=false", &picture)
+		err = OAuthCall(transport, GraphAPIPicture, &picture)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		cid, _ := strconv.ParseUint(profile.ID, 10, 64)
+
+		err = db.SyncUser(cid, profile.Name, picture.Data.Url, tok.AccessToken, tok.Expiry)
 		if err != nil {
 			log.Println(err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 
-		log.Printf("Logged in Facebook user %s (id %d)\n", profile.Name, profile.ID)
-		log.Printf("Picture URL: %s\n", picture.Data.Url)
+		/* Authenticate */
+		session.Values["cid"] = cid
+		err = session.Save(req, w)
+		if err != nil {
+			log.Println(err)
+		}
+
+		log.Printf("Logged in Facebook user id %d\n", cid)
 
 		fmt.Fprintln(w, "Done!")
 

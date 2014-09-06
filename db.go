@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"log"
+	"time"
 	"database/sql"
 	"encoding/json"
 	_ "github.com/lib/pq"
@@ -11,8 +12,8 @@ import (
 type DBProxy interface {
 	RoomId(uid string) (uint64, error)
 	NewRoom(uid string) (uint64, error)
-	NewPlayer(roomId uint64, cid uint64, scheme string) (uint64, error)
-	GetPlayer(roomId uint64, cid uint64) (uint64, error)
+	NewPlayer(roomId, cid uint64, scheme string) (uint64, error)
+	GetPlayer(roomId, cid uint64) (uint64, error)
 
 	NewUser(token string) (uint64, error)
 	VerifyToken(token string) (uint64, error)
@@ -20,10 +21,12 @@ type DBProxy interface {
 	PostHistory(msg *GameMessage) error
 	LoadHistory(id uint64) (*GameMessage, error)
 
-	LoadSession(sid string, name string) (string, error)
-	SaveSession(sid string, name string, data string) error
+	LoadSession(sid, name string) (string, error)
+	SaveSession(sid, name string, data string) error
 
 	NewInvitation(roomId uint64, token string) (uint64, error)
+
+	SyncUser(cid uint64, name, picture, token string, expires time.Time) error
 }
 
 /* PostgreSQL proxy */
@@ -223,6 +226,27 @@ func (db *PQProxy) SaveSession(sid string, name string, data string) error {
 
 		if err != nil {
 			log.Println("SaveSession: ", err)
+		}
+	}
+
+	return err
+}
+
+func (db *PQProxy) SyncUser(cid uint64, name, picture, token string, expires time.Time) error {
+	res, err := db.Exec("UPDATE client SET name = $1, picture = $2, token = $3, expires = $4 WHERE id = $5",
+						name, picture, token, expires, cid)
+
+	if err != nil {
+		log.Println("SyncUser: ", err)
+		return err
+	}
+
+	if affected, _ := res.RowsAffected(); affected == 0 {
+		_, err = db.Exec("INSERT INTO client (id, name, picture, token, expires) VALUES ($1, $2, $3, $4, $5)",
+						cid, name, picture, token, expires)
+
+		if err != nil {
+			log.Println("SyncUser: ", err)
 		}
 	}
 
