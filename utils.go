@@ -95,9 +95,10 @@ func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		context.Set(r, "player_id", pid)
 	}
 
-	/* handle */
-	/* TODO update cookie expiration date */
+	/* update cookie expiration date */
+	store.Refresh(r, w, session)
 
+	/* handle */
 	wrapper.Handler.ServeHTTP(w, r)
 
 }

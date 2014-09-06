@@ -201,7 +201,8 @@ func (db *PQProxy) NewInvitation(roomId uint64, token string) (uint64, error) {
 
 func (db *PQProxy) LoadSession(sid string, name string) (string, error) {
 	var data string
-	err := db.QueryRow("SELECT data FROM session WHERE sid = $1 AND name = $2 AND CURRENT_TIMESTAMP - timestamp < ttl", sid, name).Scan(&data)
+	/*err := db.QueryRow("SELECT data FROM session WHERE sid = $1 AND name = $2 AND CURRENT_TIMESTAMP - timestamp < ttl", sid, name).Scan(&data)*/
+	err := db.QueryRow("SELECT data FROM session WHERE sid = $1 AND name = $2", sid, name).Scan(&data)
 
 	if err != nil && err != sql.ErrNoRows {
 		log.Println("LoadSession: ", err)

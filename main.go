@@ -13,7 +13,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/context"
 	"github.com/e-asphyx/goauth2/oauth"
-	"github.com/gorilla/sessions"
 )
 
 /*-------------------------------------------------------------------------------*/
@@ -38,7 +37,7 @@ var (
 	}
 
 	db DBProxy
-	store sessions.Store
+	store *DBSessionStore
 )
 
 type newUserReply struct {
@@ -123,7 +122,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		}
 
 		transport := &oauth.Transport{Config: oauthConfig}
-		tok, err := transport.Exchange(code)
+		_, err := transport.Exchange(code)
 
 		if err != nil {
 			log.Println(err)
@@ -131,8 +130,37 @@ func Login(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		/* Get profile */
+		var profile struct {
+			ID uint64 `json:"id"`
+			Name string `json:"name"`
+		}
+
+		err = OAuthCall(transport, "https://graph.facebook.com/v2.1/me", &profile)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		/* Get picture */
+		var picture struct {
+			Data struct {
+				Url string `json:"url"`
+			} `json:"data"`
+		}
+
+		err = OAuthCall(transport, "https://graph.facebook.com/v2.1/me/picture?type=normal&redirect=false", &picture)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Logged in Facebook user %s (id %d)\n", profile.Name, profile.ID)
+		log.Printf("Picture URL: %s\n", picture.Data.Url)
+
 		fmt.Fprintln(w, "Done!")
-		log.Println(tok)
 
 		return
 	}
@@ -280,8 +308,7 @@ func main() {
 	/* Serve static */
 	router.PathPrefix("/static/").Handler(http.FileServer(http.Dir("")))
 
-	/* API */
-	router.Handle("/api/newuser", JSONHandlerFunc(NewUser)) /* TODO delete this */
+	/* router.Handle("/newuser", JSONHandlerFunc(NewUser)) */
 
 	/* token login */
 	router.HandleFunc("/login", Login)

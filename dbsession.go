@@ -49,6 +49,12 @@ func (s *DBSessionStore) Save(r *http.Request, w http.ResponseWriter, session *s
 	return nil
 }
 
+func (s *DBSessionStore) Refresh(r *http.Request, w http.ResponseWriter, session *sessions.Session) error {
+	http.SetCookie(w, sessions.NewCookie(session.Name(), session.ID, session.Options))
+
+	return nil
+}
+
 func (s *DBSessionStore) load(session *sessions.Session) error {
 	data, err := s.db.LoadSession(session.ID, session.Name())
 	if err == nil {
