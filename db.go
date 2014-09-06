@@ -61,7 +61,7 @@ func (db *PQProxy) NewRoom(uid string) (uint64, error) {
 	err := db.QueryRow("INSERT INTO room (uid) VALUES ($1) RETURNING id", uid).Scan(&roomId)
 
 	if err != nil {
-		log.Println(err)
+		log.Println("NewRoom: ", err)
 	}
 
 	return roomId, err
@@ -134,7 +134,7 @@ func (db *PQProxy) LoadHistory(id uint64) (*GameMessage, error) {
 
 		err = json.Unmarshal(area, &points)
 		if err != nil {
-			log.Println(err)
+			log.Println("LoadHistory: ",err)
 		} else {
 			msg.Areas[cid] = points
 		}
@@ -151,7 +151,7 @@ func (db *PQProxy) NewUser(token string) (uint64, error) {
 	err := db.QueryRow("INSERT INTO client (auth_token) VALUES ($1) RETURNING id", token).Scan(&cid)
 
 	if err != nil {
-		log.Println(err)
+		log.Println("NewUser: ", err)
 	}
 
 	return cid, err
@@ -162,7 +162,7 @@ func (db *PQProxy) VerifyToken(token string) (uint64, error) {
 	err := db.QueryRow("SELECT id FROM client WHERE auth_token = $1", token).Scan(&cid)
 
 	if err != nil && err != sql.ErrNoRows {
-		log.Println(err)
+		log.Println("VerifyToken: ", err)
 	}
 
 	return cid, err
@@ -174,7 +174,7 @@ func (db *PQProxy) NewPlayer(roomId uint64, cid uint64, scheme string) (uint64, 
 						"VALUES ($1, $2, $3) RETURNING id", roomId, cid, scheme).Scan(&pid)
 
 	if err != nil {
-		log.Println(err)
+		log.Println("NewPlayer", err)
 	}
 
 	return pid, err
@@ -185,7 +185,7 @@ func (db *PQProxy) GetPlayer(roomId uint64, cid uint64) (uint64, error) {
 	err := db.QueryRow("SELECT id FROM player WHERE room_id = $1 AND client_id = $2", roomId, cid).Scan(&pid)
 
 	if err != nil && err != sql.ErrNoRows {
-		log.Println(err)
+		log.Println("GetPlayer: ", err)
 	}
 
 	return pid, err
@@ -196,7 +196,7 @@ func (db *PQProxy) NewInvitation(roomId uint64, token string) (uint64, error) {
 	err := db.QueryRow("INSERT INTO invitation (room_id, code) VALUES ($1, $2) RETURNING id", roomId, token).Scan(&id)
 
 	if err != nil {
-		log.Println(err)
+		log.Println("NewInvitation: ", err)
 	}
 
 	return id, err
