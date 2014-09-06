@@ -132,7 +132,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 
 		/* Get profile */
 		var profile struct {
-			ID uint64 `json:"id"`
+			ID string `json:"id"`
 			Name string `json:"name"`
 		}
 
