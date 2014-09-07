@@ -9,18 +9,19 @@ html, body {
 	font-size: 18px;
 }
 
-.main-content {
-	text-align: center;
+.main-content-wrapper {
+	display: flex;
+	justify-content: center;
 }
 
-.main-content-board {
-	display: inline-block;
-	text-align: left;
+.main-content {
 }
 
 .user-profile {
-	float: right;
 	margin: 15px;
+	position: absolute;
+	right: 0;
+	top: 0;
 }
 
 .user-picture {
