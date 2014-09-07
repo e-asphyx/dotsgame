@@ -5,6 +5,7 @@ window.Controllers = window.Controllers || {};
 	window.Views.UserProfile = Backbone.View.extend({
 		initialize: function() {
 			this.template = _.template($("#user-profile-template").html()); /* DOM must be ready */
+			this.listenTo(this.model, 'change', this.render);
 		},
 
 		render: function() {
@@ -19,6 +20,7 @@ window.Controllers = window.Controllers || {};
 			model: this.model,
 			el: "#user-profile-box"
 		});
+		this.view.render();
 		this.model.fetch();
 	};
 })();
