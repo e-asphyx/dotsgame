@@ -1,6 +1,11 @@
 {{define "templates"}}
 	<!-- Top-right menu -->
 	<script type="text/template" id="user-profile-template">
-		<div class="user-picture" <%if(picture != ""){%> style="background-image: url('<%= picture %>');"<%}%>></div>
+		<div class="dropdown">
+			<div class="user-picture" <%if(picture != ""){%> style="background-image: url('<%= picture %>');"<%}%>></div>
+			<div class="dropdown-container">
+				<%- name %>
+			</div>
+		</div>
 	</script>
 {{end}}

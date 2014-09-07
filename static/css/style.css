@@ -9,6 +9,22 @@ html, body {
 	font-size: 18px;
 }
 
+.dropdown {
+	position: relative;
+}
+
+.dropdown-container {
+	display: none;
+	position: absolute;
+	top: 100%;
+	right: 0;
+	z-index: 100;
+}
+
+.dropdown.open>.dropdown-container {
+	display: block;
+}
+
 .main-content-wrapper {
 	display: flex;
 	justify-content: center;
