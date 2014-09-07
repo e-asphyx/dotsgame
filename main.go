@@ -30,7 +30,9 @@ const (
 )
 
 var (
-	templates = template.Must(template.ParseFiles(templatesRoot + templateMain))
+	templates = template.Must(template.ParseFiles(templatesRoot + "head.html",
+								templatesRoot + templateMain))
+
 	oauthConfig = &oauth.Config {
 		ClientId:     os.Getenv("FB_ID"),
 		ClientSecret: os.Getenv("FB_SECRET"), /* Come from Heroku app config */
@@ -219,8 +221,19 @@ func RoomInvitation(req *http.Request) (interface{}, error) {
 	return &reply, nil
 }
 
+type AuthData struct {
+	ID uint64
+}
+
 func RoomServer(w http.ResponseWriter, req *http.Request) {
-	err := templates.ExecuteTemplate(w, templateMain, nil)
+	session, _ := store.Get(req, "session")
+	cid, _ := getUint64(session.Values["cid"])
+
+	data := AuthData {
+		ID: cid,
+	}
+
+	err := templates.ExecuteTemplate(w, templateMain, &data)
     if err != nil {
 		log.Println(err)
         http.Error(w, err.Error(), http.StatusInternalServerError)

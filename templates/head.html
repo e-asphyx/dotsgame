@@ -1,0 +1,18 @@
+{{define "head"}}
+	<head>
+		<meta charset="utf-8">
+
+		<title>Dots Game</title>
+
+		<script src="/static/js/jquery-2.1.1.min.js"></script>
+		<script src="/static/js/underscore-min.js"></script>
+		<script src="/static/js/game.js"></script>
+
+  		<link rel="stylesheet" type="text/css" href="/static/css/style.css" />
+
+		<!-- exported data -->
+		<script>
+			AuthData = {{.}};
+		</script> 
+	</head>
+{{end}}
