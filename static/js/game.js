@@ -488,7 +488,7 @@ var game = {};
 	App = game.App = function(options) {
 		_.extend(this, _.pick(options, ["style", "xnodes", "ynodes"]));
 
-		this.cid = AuthData.ID;
+		this.cid = window.AuthData.ID;
 		this.canvas = $('#board');
 
 		this.canvasW = this.canvas.width() - this.style.board.padding * 2 - 1;

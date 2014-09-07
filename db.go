@@ -27,6 +27,9 @@ type DBProxy interface {
 	NewInvitation(roomId uint64, token string) (uint64, error)
 
 	SyncUser(cid uint64, name, picture, token string, expires time.Time) error
+	GetUserProfile(cid uint64) (*UserProfile, error)
+	GetPlayerProfile(cid, roomId uint64) (*UserProfile, error)
+	GetPlayers(roomId uint64) ([]UserProfile, error)
 }
 
 /* PostgreSQL proxy */
@@ -251,4 +254,77 @@ func (db *PQProxy) SyncUser(cid uint64, name, picture, token string, expires tim
 	}
 
 	return err
+}
+
+func (db *PQProxy) GetUserProfile(cid uint64) (*UserProfile, error) {
+	var name, picture sql.NullString
+
+	err := db.QueryRow("SELECT name, picture FROM client WHERE id = $1", cid).Scan(&name, &picture)
+
+	if err != nil && err != sql.ErrNoRows {
+		log.Println("GetProfile: ", err)
+	}
+
+	profile := UserProfile {
+		ID: cid,
+		Name: name.String,
+		Picture: picture.String,
+	}
+
+	return &profile, err
+}
+
+func (db *PQProxy) GetPlayerProfile(cid, roomId uint64) (*UserProfile, error) {
+	var (
+		name, picture sql.NullString
+		pid uint64
+	)
+
+	err := db.QueryRow("SELECT name, picture, player.id FROM client LEFT JOIN player ON client.id = player.client_id " +
+						"WHERE client.id = $1 AND player.room_id = $2", cid, roomId).Scan(&name, &picture, &pid)
+
+	if err != nil && err != sql.ErrNoRows {
+		log.Println("GetProfileRoom: ", err)
+	}
+
+	profile := UserProfile {
+		ID: cid,
+		Name: name.String,
+		Picture: picture.String,
+		Player: pid,
+	}
+
+	return &profile, err
+}
+
+func (db *PQProxy) GetPlayers(roomId uint64) ([]UserProfile, error) {
+	var result []UserProfile
+
+	rows, err := db.Query("SELECT client.id, name, picture, player.id FROM client LEFT JOIN player ON client.id = player.client_id " +
+						"WHERE player.room_id = $1", roomId)
+
+	if err != nil {return nil, err}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			name, picture sql.NullString
+			cid, pid uint64
+		)
+
+		err = rows.Scan(&cid, &name, &picture, &pid)
+		if err != nil {return nil, err}
+
+		result = append(result, UserProfile {
+			ID: cid,
+			Name: name.String,
+			Picture: picture.String,
+			Player: pid,
+		})
+	}
+
+	err = rows.Err()
+	if err != nil {return nil, err}
+
+	return result, err
 }

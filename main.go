@@ -31,7 +31,8 @@ const (
 
 var (
 	templates = template.Must(template.ParseFiles(templatesRoot + "head.html",
-								templatesRoot + templateMain))
+													templatesRoot + "templates.html",
+													templatesRoot + templateMain))
 
 	oauthConfig = &oauth.Config {
 		ClientId:     os.Getenv("FB_ID"),
@@ -188,6 +189,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 	http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 }
 
+/*
 func NewUser(req *http.Request) (interface{}, error) {
 	token := randStr(20)
 
@@ -202,6 +204,56 @@ func NewUser(req *http.Request) (interface{}, error) {
 	}
 
 	return &reply, nil
+}
+*/
+
+type UserProfile struct {
+	ID uint64 `json:"id,omitempty"`
+	Name string `json:"name"`
+	Picture string `json:"picture"`
+	Player uint64 `json:"player,omitempty"`
+}
+
+func GetUser(req *http.Request) (interface{}, error) {
+	session, _ := store.Get(req, "session")
+	cid, _ := getUint64(session.Values["cid"])
+	reqId, _ := strconv.ParseUint(mux.Vars(req)["user_id"], 10, 64)
+
+	/* Only self */
+	if cid != reqId {
+		return nil, HTTPError(http.StatusForbidden)
+	}
+
+	reply, err := db.GetUserProfile(cid)
+	if err != nil {
+		return nil, HTTPError(http.StatusNotFound)
+	}
+
+	return reply, nil
+}
+
+func GetPlayer(req *http.Request) (interface{}, error) {
+	session, _ := store.Get(req, "session")
+	cid, _ := getUint64(session.Values["cid"])
+	roomId, _ := context.Get(req, "room_id").(uint64)
+
+	reply, err := db.GetPlayerProfile(cid, roomId)
+	if err != nil {
+		return nil, HTTPError(http.StatusNotFound)
+	}
+
+	return reply, nil
+}
+
+func GetPlayers(req *http.Request) (interface{}, error) {
+	roomId, _ := context.Get(req, "room_id").(uint64)
+
+	reply, err := db.GetPlayers(roomId)
+	if err != nil {
+		return nil, HTTPError(http.StatusNotFound)
+	}
+
+	return reply, nil
 }
 
 func RoomInvitation(req *http.Request) (interface{}, error) {
@@ -347,11 +399,20 @@ func main() {
 	/* Main page */
 	router.Handle("/", NewAuthWrapper(http.HandlerFunc(NewRoom), (*OAuthRedirect)(oauthConfig)))
 
+	/* Main API */
+	router.Path("/api/users/{user_id}").Methods("GET").Handler(NewAuthWrapper(JSONHandlerFunc(GetUser),
+																					(*OAuthRedirect)(oauthConfig)))
 	/* Game room */
 	router.Handle("/{room_id}/", NewAuthWrapper(http.HandlerFunc(RoomServer), (*OAuthRedirect)(oauthConfig)))
 
 	/* Room API */
-	router.Path("/{room_id}/api/invitation").Methods("GET").Handler(NewAuthWrapper(JSONHandlerFunc(RoomInvitation),
+	router.Path("/{room_id}/api/invitation").Methods("POST").Handler(NewAuthWrapper(JSONHandlerFunc(RoomInvitation),
+																					(*OAuthRedirect)(oauthConfig)))
+
+	router.Path("/{room_id}/api/users").Methods("GET").Handler(NewAuthWrapper(JSONHandlerFunc(GetPlayers),
+																					(*OAuthRedirect)(oauthConfig)))
+
+	router.Path("/{room_id}/api/users/{user_id}").Methods("GET").Handler(NewAuthWrapper(JSONHandlerFunc(GetPlayer),
 																					(*OAuthRedirect)(oauthConfig)))
 
 	/* Serve WebSocket */

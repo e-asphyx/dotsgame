@@ -6,13 +6,19 @@
 
 		<script src="/static/js/jquery-2.1.1.min.js"></script>
 		<script src="/static/js/underscore-min.js"></script>
+		<script src="/static/js/backbone-min.js"></script>
+		<script src="/static/js/views.js"></script>
+		<script src="/static/js/models.js"></script>
 		<script src="/static/js/game.js"></script>
 
+		<!-- Underscore templates -->
+		{{template "templates"}}
+		
   		<link rel="stylesheet" type="text/css" href="/static/css/style.css" />
 
 		<!-- exported data -->
 		<script>
-			AuthData = {{.}};
+			window.AuthData = {{.}};
 		</script> 
 	</head>
 {{end}}

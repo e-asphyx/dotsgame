@@ -7,12 +7,26 @@ html, body {
 	color: #2f3403;
 	font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif;
 	font-size: 18px;
-	text-align: center;
 }
 
 .main-content {
+	text-align: center;
+}
+
+.main-content-board {
 	display: inline-block;
 	text-align: left;
+}
+
+.user-profile {
+	float: right;
+	margin: 15px;
+}
+
+.user-picture {
+	width: 50px;
+	height: 50px;
+	border-radius: 50%;
 }
 
 div.board {

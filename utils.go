@@ -138,7 +138,7 @@ func getUint64 (v interface{}) (uint64, bool) {
 		ret = uint64(val)
 
 	case string:
-		ret, _ = strconv.ParseUint(val, 10, 0)
+		ret, _ = strconv.ParseUint(val, 10, 64)
 	}
 
 	return ret, true
