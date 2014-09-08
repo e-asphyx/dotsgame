@@ -551,7 +551,7 @@ var game = {};
 
 			this.conn = new WebSocket(proto + "//" + loc.host + loc.pathname +
 					(loc.pathname[loc.pathname.length - 1] != "/" ? "/" : "") +
-					"websocket?cid=" + this.cid);
+					"websocket");
 			var self = this;
 			this.conn.onclose = function() {
 				self.displayAlert("Connection closed");

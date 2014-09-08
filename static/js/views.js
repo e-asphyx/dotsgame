@@ -26,5 +26,7 @@ window.Controllers = window.Controllers || {};
 })();
 
 $(document).ready(function(){
+	Backbone.history.start({pushState: true});
+
 	window.userProfile = new Controllers.UserProfile(window.AuthData.ID);
 });
