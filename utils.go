@@ -20,13 +20,6 @@ func (err HTTPError) Error() string {
 	return http.StatusText(int(err))
 }
 
-/*-------------------------------------------------------------------------------*/
-
-type Redirector interface {
-	Redirect(w http.ResponseWriter, r *http.Request) error
-}
-
-/*-------------------------------------------------------------------------------*/
 /* wrap function into http.Handler iface */
 type JSONHandlerFunc func(*http.Request) (interface{}, error)
 
@@ -56,17 +49,17 @@ func (f JSONHandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 /*-------------------------------------------------------------------------------*/
 type AuthWrapper struct {
 	Handler http.Handler
-	Redirect Redirector
+	Redirect string
 }
 
 func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "session")
 
 	cid, ok := getUint64(session.Values["cid"])
-	if !ok {
+	if !ok || cid == 0 {
 		/* redirect to login dialog */
-		if wrapper.Redirect != nil {
-			wrapper.Redirect.Redirect(w, r)
+		if wrapper.Redirect != "" {
+			http.Redirect(w, r, wrapper.Redirect, http.StatusTemporaryRedirect)
 			return
 		}
 
@@ -103,7 +96,7 @@ func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func NewAuthWrapper(handler http.Handler, redirect Redirector) *AuthWrapper {
+func NewAuthWrapper(handler http.Handler, redirect string) *AuthWrapper {
 	return &AuthWrapper{Handler: handler, Redirect: redirect}
 }
 

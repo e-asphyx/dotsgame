@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"log"
 	"net/http"
@@ -21,16 +20,18 @@ import (
 const (
 	templatesRoot = "templates/"
 	templateMain = "index.html"
+	templateLogin = "login.html"
 	keepAliveInterval = 30 /* sec */
 
 	FlagKeepAlive = 0x1
 
 	GraphAPIProfile = "https://graph.facebook.com/v2.1/me"
-	GraphAPIPicture = "https://graph.facebook.com/v2.1/me/picture?type=normal&redirect=false"
+	GraphAPIPicture = "https://graph.facebook.com/v2.1/me/picture?type=large&redirect=false"
 )
 
 var (
 	templates = template.Must(template.ParseFiles(templatesRoot + "head.html",
+													templatesRoot + "login.html",
 													templatesRoot + "templates.html",
 													templatesRoot + templateMain))
 
@@ -88,6 +89,8 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 }
 
 func Login(w http.ResponseWriter, req *http.Request) {
+	session, _ := store.Get(req, "session")
+
 	if token := req.FormValue("token"); token != "" {
 		/* Test user login */
 		cid, err := db.VerifyToken(token)
@@ -98,7 +101,6 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		}
 
 		/* Authenticate */
-		session, _ := store.New(req, "session")
 		session.Values["cid"] = cid
 
 		err = session.Save(req, w)
@@ -107,6 +109,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		}
 
 		log.Printf("User %d logged in\n", cid)
+		http.Redirect(w, req, "/", http.StatusTemporaryRedirect)
 		return
 	}
 
@@ -117,8 +120,6 @@ func Login(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
-
-		session, _ := store.Get(req, "session")
 
 		newstate, ok := session.Values["state"].(string)
 		if !ok || state != newstate {
@@ -180,32 +181,47 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		}
 
 		log.Printf("Logged in Facebook user id %d\n", cid)
-
-		fmt.Fprintln(w, "Done!")
+		http.Redirect(w, req, "/", http.StatusTemporaryRedirect)
 
 		return
 	}
 
-	http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-}
+	/* Redirect to OAuth dialog */
+	state := randStr(6)
+	session.Values["state"] = state
 
-/*
-func NewUser(req *http.Request) (interface{}, error) {
-	token := randStr(20)
-
-	cid, err := db.NewUser(token)
-	if err != nil {return nil, err}
-
-	log.Printf("New user: %d\n", cid)
-
-	reply := newUserReply {
-		ID: cid,
-		AuthToken: token,
+	err := session.Save(req, w)
+	if err != nil {
+		log.Println(err)
 	}
 
-	return &reply, nil
+	http.Redirect(w, req, oauthConfig.AuthCodeURL(state), http.StatusTemporaryRedirect)
 }
-*/
+
+/* Display login page */
+func LoginPage(w http.ResponseWriter, req *http.Request) {
+	err := templates.ExecuteTemplate(w, templateLogin, nil)
+    if err != nil {
+		log.Println(err)
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
+}
+
+func Logout(w http.ResponseWriter, req *http.Request) {
+	session, _ := store.Get(req, "session")
+	cid, _ := getUint64(session.Values["cid"])
+
+	log.Printf("Logout %d\n", cid)
+
+	delete(session.Values, "cid")
+
+	err := session.Save(req, w)
+	if err != nil {
+		log.Println(err)
+	}
+
+	http.Redirect(w, req, "/login/", http.StatusTemporaryRedirect)
+}
 
 type UserProfile struct {
 	ID uint64 `json:"id,omitempty"`
@@ -353,26 +369,6 @@ func WebSocketServer(ws *websocket.Conn) {
 }
 
 /*-------------------------------------------------------------------------------*/
-type OAuthRedirect oauth.Config
-
-func (redirect *OAuthRedirect) Redirect(w http.ResponseWriter, r *http.Request) error {
-	config := (*oauth.Config)(redirect)
-	state := randStr(6)
-
-	session, _ := store.Get(r, "session")
-	session.Values["state"] = state
-	err := session.Save(r, w)
-
-	if err != nil {
-		log.Println(err)
-	}
-
-	http.Redirect(w, r, config.AuthCodeURL(state), http.StatusTemporaryRedirect)
-
-	return nil
-}
-
-/*-------------------------------------------------------------------------------*/
 
 func main() {
 	log.Println("Start")
@@ -386,37 +382,34 @@ func main() {
 	store = NewDBSessionStore(db)
 
 	router := mux.NewRouter()
-	router.StrictSlash(true)
 
 	/* Serve static */
 	router.PathPrefix("/static/").Handler(http.FileServer(http.Dir("")))
 
-	/* router.Handle("/newuser", JSONHandlerFunc(NewUser)) */
+	/* Login page */
+	router.HandleFunc("/login/", LoginPage)
 
-	/* token login */
+	/* Login landing point  */
 	router.HandleFunc("/login", Login)
 
+	router.Handle("/logout/", NewAuthWrapper(http.HandlerFunc(Logout), "/login/"))
+
 	/* Main page */
-	router.Handle("/", NewAuthWrapper(http.HandlerFunc(NewRoom), (*OAuthRedirect)(oauthConfig)))
+	router.Handle("/", NewAuthWrapper(http.HandlerFunc(NewRoom), "/login/"))
 
 	/* Main API */
-	router.Path("/api/users/{user_id}").Methods("GET").Handler(NewAuthWrapper(JSONHandlerFunc(GetUser),
-																					(*OAuthRedirect)(oauthConfig)))
+	router.Path("/api/users/{user_id}").Methods("GET").Handler(NewAuthWrapper(JSONHandlerFunc(GetUser), "/login/"))
+
 	/* Game room */
-	router.Handle("/{room_id}/", NewAuthWrapper(http.HandlerFunc(RoomServer), (*OAuthRedirect)(oauthConfig)))
+	router.Handle("/{room_id}/", NewAuthWrapper(http.HandlerFunc(RoomServer), "/login/"))
 
 	/* Room API */
-	router.Path("/{room_id}/api/invitation").Methods("POST").Handler(NewAuthWrapper(JSONHandlerFunc(RoomInvitation),
-																					(*OAuthRedirect)(oauthConfig)))
-
-	router.Path("/{room_id}/api/users").Methods("GET").Handler(NewAuthWrapper(JSONHandlerFunc(GetPlayers),
-																					(*OAuthRedirect)(oauthConfig)))
-
-	router.Path("/{room_id}/api/users/{user_id}").Methods("GET").Handler(NewAuthWrapper(JSONHandlerFunc(GetPlayer),
-																					(*OAuthRedirect)(oauthConfig)))
+	router.Path("/{room_id}/api/invitation").Methods("POST").Handler(NewAuthWrapper(JSONHandlerFunc(RoomInvitation), "/login/"))
+	router.Path("/{room_id}/api/users").Methods("GET").Handler(NewAuthWrapper(JSONHandlerFunc(GetPlayers), "/login/"))
+	router.Path("/{room_id}/api/users/{user_id}").Methods("GET").Handler(NewAuthWrapper(JSONHandlerFunc(GetPlayer), "/login/"))
 
 	/* Serve WebSocket */
-	router.Handle("/{room_id}/websocket", NewAuthWrapper(websocket.Handler(WebSocketServer), (*OAuthRedirect)(oauthConfig)))
+	router.Handle("/{room_id}/websocket", NewAuthWrapper(websocket.Handler(WebSocketServer), "/login/"))
 
 	http.Handle("/", router)
 	/* Start server */

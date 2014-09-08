@@ -4,7 +4,13 @@
 		<div class="dropdown">
 			<div class="user-picture" <%if(picture != ""){%> style="background-image: url('<%= picture %>');"<%}%>></div>
 			<div class="dropdown-container">
-				<%- name %>
+				<div class="profile-flexbox">
+					<div class="profile-user-picture flexbox-item"<%if(picture != ""){%> style="background-image: url('<%= picture %>');"<%}%>></div>
+					<div class="flexbox-item">
+						<p><%- name %></p>
+						<a class="button" href="/logout">Logout</a>
+					</div>
+				</div>
 			</div>
 		</div>
 	</script>

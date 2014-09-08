@@ -6,7 +6,8 @@ html, body {
 	background: #a3aa69;
 	color: #2f3403;
 	font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif;
-	font-size: 18px;
+	font-size: 1em;
+	height: 100%;
 }
 
 .dropdown {
@@ -19,10 +20,50 @@ html, body {
 	top: 100%;
 	right: 0;
 	z-index: 100;
+	background: #f2f6d0;
+	border-radius: 0.4em;
+	box-sizing: border-box;
+	padding: 0.6em;
+	margin: 0.6em 0 0 0;
+	float: right;
+	box-shadow: 0.1em 0.1em 0.5em 0.2em rgba(0,0,0,.2);
+}
+
+.button {
+	display: inline-block;
+	background: #c6cc95;
+	padding: 0.4em;
+	border-radius: 0.4em;
+	color: inherit;
+	text-decoration: inherit;
+	border: 1px solid #2f3403;
 }
 
 .dropdown.open>.dropdown-container {
 	display: block;
+}
+
+.profile-flexbox {
+	display: flex;
+	min-width: 15em;
+}
+
+.flexbox-item {
+	margin-right: 0.6em;
+}
+
+.flexbox-item:last-child {
+	margin-right: 0;
+}
+
+.profile-user-picture {
+	width: 100px;
+	height: 100px;
+	background-position: center;
+	background-size: cover;
+	border-radius: 0.2em;
+	flex-shrink: 0;
+	flex-grow: 0;
 }
 
 .main-content-wrapper {
@@ -30,11 +71,8 @@ html, body {
 	justify-content: center;
 }
 
-.main-content {
-}
-
 .user-profile {
-	margin: 15px;
+	margin: 1em;
 	position: absolute;
 	right: 0;
 	top: 0;
@@ -50,9 +88,9 @@ html, body {
 
 div.board {
 	background: #f2f6d0;
-	border-radius: 6px;
+	border-radius: 0.4em;
 	box-sizing: border-box;
-	padding: 10px;
+	padding: 0.6em;
 }
 
 canvas.board {
@@ -61,4 +99,41 @@ canvas.board {
 
 .alert {
 	color: rgb(245, 62, 5);
+}
+
+.login-main {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	min-height: 100%;
+}
+
+img.icon {
+	width: 2em;
+	height: 2em;
+}
+
+.flex-button {
+	display: flex;
+	align-items: center;
+}
+
+.lg1 {
+	font-size: 1.2em;
+}
+
+.lg2 {
+	font-size: 1.4em;
+}
+
+.lg3 {
+	font-size: 1.6em;
+}
+
+.lg4 {
+	font-size: 1.8em;
+}
+
+.lg5 {
+	font-size: 2.0em;
 }
