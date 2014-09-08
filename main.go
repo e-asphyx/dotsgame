@@ -392,7 +392,7 @@ func main() {
 	/* Login landing point  */
 	router.HandleFunc("/login", Login)
 
-	router.Handle("/logout/", NewAuthWrapper(http.HandlerFunc(Logout), "/login/"))
+	router.Handle("/logout", NewAuthWrapper(http.HandlerFunc(Logout), "/login/"))
 
 	/* Main page */
 	router.Handle("/", NewAuthWrapper(http.HandlerFunc(NewRoom), "/login/"))
