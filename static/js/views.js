@@ -27,6 +27,9 @@ window.Controllers = window.Controllers || {};
 
 $(document).ready(function(){
 	Backbone.history.start({pushState: true});
+	if(window.location.hash == '#_=_') {
+		Backbone.history.navigate("", {trigger: false, replace: true});
+    }
 
 	window.userProfile = new Controllers.UserProfile(window.AuthData.ID);
 });
