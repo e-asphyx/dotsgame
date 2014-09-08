@@ -2,47 +2,50 @@ var game = {};
 (function() {
 	game.style = {
 		board: {
-			padding: 7.0,
+			padding: 6.0,
 			grid: {
 				"strokeStyle": "#cccccc",
 				"lineWidth": 1.0
 			},
 		},
 
-		players: {
-			"A": {
-				radius: 6.5,
-				point: {
-					"fillStyle": "rgb(131,172,48)"
-				},
-				area: {
-					"fillStyle": "rgba(131,172,48,0.2)",
-					"strokeStyle": "rgb(131,172,48)",
+		player: {
+			radius: 5.5,
+			area: {
+				style: {
 					"lineCap": "round",
 					"lineJoin": "round",
 					"lineWidth": 1.0
-				}
-			},
-
-			"B": {
-				radius: 6.5,
-				point: {
-					"fillStyle": "#ff0000"
 				},
-				area: {
-					"fillStyle": "rgba(255,0,0,0.2)",
-					"strokeStyle": "#ff0000",
-					"lineCap": "round",
-					"lineJoin": "round",
-					"lineWidth": 1.0
-				}
+				alpha: 0.2
 			}
+		},
+
+		schemes: {
+			"grass":            [131, 172, 48],
+   			"foggy-blue":       [0x0a, 0x84, 0xe8],
+    		"foggy-cyan":       [0x02, 0xed, 0xff],
+   			"blueberry-milk":   [0x90, 0x0c, 0xff],
+   			"blue":             [0x24, 0x01, 0xe8],
+   			"red":              [0xe8, 0x18, 0x06],
+			"orange":           [0xff, 0x61, 0x0b],
+			"sienna":           [0xe8, 0x8e, 0x08],
+			"lime":             [0xd1, 0xff, 0x0f],
+			"lichen":           [0x00, 0xff, 0xaa]
 		}
 	};
 
 	CanvasRenderingContext2D.prototype.setStyle = function(obj) {
 		_.extend(this, obj);
 	};
+
+	function RGB(v) {
+		return "rgb(" + v[0] + "," + v[1] + "," + v[2] + ")";
+	}
+
+	function RGBA(v, a) {
+		return "rgba(" + v[0] + "," + v[1] + "," + v[2] + "," + a + ")";
+	}
 
 	function RubberBand(objdata) {
 		if(objdata instanceof Array) {
@@ -496,12 +499,7 @@ var game = {};
 		this.canvasH = this.gridStep * (this.ynodes - 1);
 
 		this.canvas.attr("height", Math.round(this.canvasH + this.style.board.padding * 2 + 1));
-
-		/* TODO */
-		this.playersStyles = {
-			0: this.style.players["A"],
-			1: this.style.players["B"]
-		}
+		ensureHIDPI(this.canvas.get(0));
 
 		this.points = {};
 		this.areas = {};
@@ -565,7 +563,7 @@ var game = {};
 
 			_.each(this.points, function(points, cid) {
 				_.each(points, function(p) {
-					this.drawPoint(p, this.playersStyles[cid]);
+					this.drawPoint(p, "grass");
 				}, this);
 			}, this);
 
@@ -601,15 +599,17 @@ var game = {};
 			return this;
 		},
 
-		drawPoint: function(point, style) {
+		drawPoint: function(point, scheme) {
 			var pad = this.style.board.padding;
 			var ctx = this.canvas.get(0).getContext("2d");
 			ctx.save();
-			ctx.setStyle(style.point);
+		
+			ctx.fillStyle = RGB(this.style.schemes[scheme]);
+			
 			ctx.beginPath();
 			ctx.arc(pad + Math.round(point.x * this.gridStep) + 0.5,
 					pad + Math.round(point.y * this.gridStep) + 0.5,
-					style.radius, 0, Math.PI*2, true);
+					this.style.player.radius, 0, Math.PI*2, true);
 			ctx.fill();
 			ctx.restore();
 
@@ -626,7 +626,10 @@ var game = {};
 			_.each(this.areas, function(area, cid) {
 				_.each(area, function(band) {
 					ctx.save();
-					ctx.setStyle(this.playersStyles[cid].area);
+
+					ctx.setStyle(this.style.player.area.style);
+					ctx.strokeStyle = RGB(this.style.schemes["grass"]);
+					ctx.fillStyle = RGBA(this.style.schemes["grass"], this.style.player.area.alpha);
 
 					ctx.beginPath();
 					ctx.moveTo(
@@ -805,7 +808,7 @@ var game = {};
 					/* redraw */
 					this.renderGame();
 				} else {
-					this.drawPoint(pos, this.playersStyles[cid]);
+					this.drawPoint(pos, "grass");
 				}
 			}
 
@@ -835,12 +838,47 @@ var game = {};
 			}
 		},
 	};
+
+	function ensureHIDPI(canvas) {
+		var context = canvas.getContext('2d');
+
+		/* query the various pixel ratios */
+		var devicePixelRatio = window.devicePixelRatio || 1;
+	
+		var backingStoreRatio = context.webkitBackingStorePixelRatio ||
+							context.mozBackingStorePixelRatio ||
+							context.msBackingStorePixelRatio ||
+							context.oBackingStorePixelRatio ||
+							context.backingStorePixelRatio || 1;
+
+		var ratio = devicePixelRatio / backingStoreRatio;
+
+		/* upscale the canvas if the two ratios don't match */
+		if(devicePixelRatio !== backingStoreRatio) {
+			var oldWidth = canvas.width;
+			var oldHeight = canvas.height;
+
+			canvas.width = oldWidth * ratio;
+			canvas.height = oldHeight * ratio;
+
+			canvas.style.width = oldWidth + 'px';
+			canvas.style.height = oldHeight + 'px';
+
+			/*
+			now scale the context to counter
+			the fact that we've manually scaled
+			our canvas element
+			*/
+			context.scale(ratio, ratio);
+		}
+	}
+	
 })();
 
 $(document).ready(function(){
 	window.app = new game.App({
 		style: game.style,
 		xnodes: 30,
-		ynodes: 25,
+		ynodes: 30,
 	});
 });
