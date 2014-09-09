@@ -4,8 +4,8 @@
 html, body {
 	margin: 0;
 	padding: 0;
-	background: #a3aa69;
-	color: #2f3403;
+	background: #ad9d7d;
+	color: #594928;
 	font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif;
 	font-size: 1em;
 	height: 100%;
@@ -13,7 +13,12 @@ html, body {
 
 h1 {
 	font-size: 4.5em;
-	margin: 0.2em 0 0.2em 0;
+	margin: 0.2em 0;
+}
+
+p {
+	margin: 1em 0;
+	padding: 0;
 }
 
 .dropdown {
@@ -26,7 +31,7 @@ h1 {
 	top: 100%;
 	right: 0;
 	z-index: 100;
-	background: #f2f6d0;
+	background: #ddd0b6;
 	border-radius: 0.4em;
 	box-sizing: border-box;
 	padding: 0.6em;
@@ -37,19 +42,30 @@ h1 {
 
 .button {
 	display: inline-block;
-	background: #c6cc95;
+	background: #7f7052;
 	padding: 0.4em;
 	border-radius: 0.4em;
 	color: inherit;
 	text-decoration: inherit;
-	border: 1px solid #5a6020;
+	/*border: 1px solid #594928;*/
+	border: 0;
 	font-size: 1em;
+	color: #fff9ed;
+}
+
+.button>.caption {
+	color: #ddd0b6;
+	margin-bottom: 0.5em;
+}
+
+.button>.label {
+	font-size: 1.2em;
 }
 
 .btn-dark {
-	background: #494e19;
-	color: #fafde5;
-	border: 1px solid #2f3403;
+	background: #594928;
+	/*border: 1px solid #312818;*/
+	border: 0;
 }
 
 .dropdown.open>.dropdown-container {
@@ -157,10 +173,15 @@ h1 {
 }
 
 div.board {
-	background: #f2f6d0;
+	background: #fff9ed;
 	border-radius: 0.4em;
 	box-sizing: border-box;
 	padding: 0.6em;
+}
+
+.board-wrapper {
+	display: flex;
+	justify-content: center;
 }
 
 canvas.board {

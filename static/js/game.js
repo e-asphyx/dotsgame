@@ -900,7 +900,7 @@ var game = {};
 $(document).ready(function(){
 	window.app = new game.App({
 		style: game.style,
-		xnodes: 30,
+		xnodes: 40,
 		ynodes: 30,
 	});
 });
