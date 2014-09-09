@@ -506,6 +506,9 @@ var game = {};
 		this.map = [];
 		this.areasMaps = [];
 
+		this.players = {};
+		this.players[this.cid] = this.randomScheme();
+
 		_.times(this.ynodes, function(n){this.map[n] = [];}, this);
 
 		this.renderGame();
@@ -514,9 +517,29 @@ var game = {};
 	}
 
 	App.prototype = {
+		randomScheme: function() {
+			var styles = _.difference(_.keys(this.style.schemes), _.values(this.players));
+			if(styles.length != 0) {
+				return styles[Math.round(Math.random() * (styles.length - 1))];
+			}
+			
+			console.log("No schemes left!");
+		},
+
 		onMessage: function(evt) {
 			var msg = JSON.parse(event.data);
 			console.log(msg);
+
+			if(msg.pl) {
+				/* TODO notify */
+				_.each(msg.pl, function(scheme, cid) {
+					this.players[cid] = (scheme != "" ? scheme : this.randomScheme());
+				}, this);
+			}
+
+			/* TODO leave */
+			
+			/* TODO turn */
 
 			if(msg.p) {
 				_.each(msg.p, function(points, cid) {
@@ -563,7 +586,7 @@ var game = {};
 
 			_.each(this.points, function(points, cid) {
 				_.each(points, function(p) {
-					this.drawPoint(p, "grass");
+					this.drawPoint(p, this.players[cid]);
 				}, this);
 			}, this);
 
@@ -628,8 +651,8 @@ var game = {};
 					ctx.save();
 
 					ctx.setStyle(this.style.player.area.style);
-					ctx.strokeStyle = RGB(this.style.schemes["grass"]);
-					ctx.fillStyle = RGBA(this.style.schemes["grass"], this.style.player.area.alpha);
+					ctx.strokeStyle = RGB(this.style.schemes[this.players[cid]]);
+					ctx.fillStyle = RGBA(this.style.schemes[this.players[cid]], this.style.player.area.alpha);
 
 					ctx.beginPath();
 					ctx.moveTo(
@@ -751,7 +774,6 @@ var game = {};
 		newPoint: function(pos) {
 			if(this.conn && this.conn.readyState == WebSocket.OPEN && this.addPoint(pos, this.cid)) {
 				var msg = {
-					cid: this.cid,
 					p: new MsgMap({cid: this.cid, data: [pos]})
 				};
 
@@ -808,7 +830,7 @@ var game = {};
 					/* redraw */
 					this.renderGame();
 				} else {
-					this.drawPoint(pos, "grass");
+					this.drawPoint(pos, this.players[cid]);
 				}
 			}
 
@@ -878,7 +900,7 @@ var game = {};
 $(document).ready(function(){
 	window.app = new game.App({
 		style: game.style,
-		xnodes: 30,
+		xnodes: 40,
 		ynodes: 30,
 	});
 });

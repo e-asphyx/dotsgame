@@ -1,13 +1,24 @@
 /* http://paletton.com/#uid=1210u0kcglL4Zvw8Eq6eXhmkwen */
+/* http://paletton.com/#uid=10X0u0k8YlL2jFR5HrLbnfVhMbe */
 
 html, body {
 	margin: 0;
 	padding: 0;
-	background: #a3aa69;
-	color: #2f3403;
+	background: #ad9d7d;
+	color: #594928;
 	font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif;
 	font-size: 1em;
 	height: 100%;
+}
+
+h1 {
+	font-size: 4.5em;
+	margin: 0.2em 0;
+}
+
+p {
+	margin: 1em 0;
+	padding: 0;
 }
 
 .dropdown {
@@ -20,7 +31,7 @@ html, body {
 	top: 100%;
 	right: 0;
 	z-index: 100;
-	background: #f2f6d0;
+	background: #ddd0b6;
 	border-radius: 0.4em;
 	box-sizing: border-box;
 	padding: 0.6em;
@@ -31,12 +42,30 @@ html, body {
 
 .button {
 	display: inline-block;
-	background: #c6cc95;
+	background: #7f7052;
 	padding: 0.4em;
 	border-radius: 0.4em;
 	color: inherit;
 	text-decoration: inherit;
-	border: 1px solid #2f3403;
+	/*border: 1px solid #594928;*/
+	border: 0;
+	font-size: 1em;
+	color: #fff9ed;
+}
+
+.button>.caption {
+	color: #ddd0b6;
+	margin-bottom: 0.5em;
+}
+
+.button>.label {
+	font-size: 1.2em;
+}
+
+.btn-dark {
+	background: #594928;
+	/*border: 1px solid #312818;*/
+	border: 0;
 }
 
 .dropdown.open>.dropdown-container {
@@ -56,6 +85,46 @@ html, body {
 	margin-right: 0;
 }
 
+.flexbox-item-lg {
+	margin-right: 1em;
+}
+
+.flexbox-item-lg:last-child {
+	margin-right: 0;
+}
+
+.btn-row {
+	display: flex;
+	justify-content: flex-end;
+	margin-bottom: 1em;
+}
+
+.btn-row>* {
+	margin-right: 1em;
+}
+
+.btn-row>*:last-child {
+	margin-right: 0;
+}
+
+.btn-row:last-child {
+	margin-bottom: 0;
+}
+
+.btn-row>.grow {
+	flex: 1 1 auto;
+}
+
+.toolbar-flexbox {
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+}
+
+.flex-grow {
+	flex-grow: 1;
+}
+
 .profile-user-picture {
 	width: 100px;
 	height: 100px;
@@ -71,10 +140,27 @@ html, body {
 	justify-content: center;
 }
 
+.main-content>div {
+	margin-bottom: 1em;
+}
+
+/*
+.main-content>div:last-child {
+	margin-bottom: 0;
+}
+*/
+
 .user-profile {
 	margin: 1em;
 	position: absolute;
 	right: 0;
+	top: 0;
+}
+
+.user-menu {
+	margin: 1em;
+	position: absolute;
+	left: 0;
 	top: 0;
 }
 
@@ -87,10 +173,15 @@ html, body {
 }
 
 div.board {
-	background: #f2f6d0;
+	background: #fff9ed;
 	border-radius: 0.4em;
 	box-sizing: border-box;
 	padding: 0.6em;
+}
+
+.board-wrapper {
+	display: flex;
+	justify-content: center;
 }
 
 canvas.board {
@@ -116,6 +207,10 @@ img.icon {
 .flex-button {
 	display: flex;
 	align-items: center;
+}
+
+.board-heading {
+	display: flex;
 }
 
 .lg1 {

@@ -4,15 +4,51 @@
 
 	<body>
 		<!-- User menu -->
+		<div class="user-menu">
+			<a class="button btn-dark" href="/" target="_blank">New Game</a>
+		</div>
+		
+		<!-- User menu -->
 		<div class="user-profile" id="user-profile-box">
 		</div>
 
 		<!-- Centered main box -->
 		<div class="main-content-wrapper">
 			<div class="main-content">
+				<div class="board-heading">
+					<div class="flexbox-item-lg flex-grow">
+						<h1>Dots</h1>
+						<p class="lg1">Capture enemy dots by surrounding them<br>with a continuous line</p>
+					</div>
+					<div class="flexbox-item-lg toolbar-flexbox">
+						<div class="btn-row">
+							<button type="button" class="button">Clear Game</button>
+							<button type="button" class="button">Invite Player</button>
+							<button type="button" class="button">Leave</button>
+						</div>
+						<div class="btn-row">
+							<button type="button" class="button grow">
+								<div class="caption">Left</div>
+								<div class="label">0</div>
+							</button>
+							<button type="button" class="button grow">
+								<div class="caption">Turn</div>
+								<div class="label">XXX</div>
+							</button>
+							<button type="button" class="button grow">
+								<div class="caption">Next</div>
+								<div class="label">XXX</div>
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Board -->
 				<div class="alert"></div>
-				<div class="board">
-					<canvas id="board" class="board" width="600" height="600"></canvas>
+				<div class="board-wrapper">
+					<div class="board">
+						<canvas id="board" class="board" width="800" height="800"></canvas>
+					</div>
 				</div>
 			</div>
 		</div>
