@@ -276,12 +276,12 @@ func (db *PQProxy) GetUserProfile(cid uint64) (*UserProfile, error) {
 
 func (db *PQProxy) GetPlayerProfile(cid, roomId uint64) (*UserProfile, error) {
 	var (
-		name, picture sql.NullString
+		name, picture, scheme sql.NullString
 		pid uint64
 	)
 
-	err := db.QueryRow("SELECT name, picture, player.id FROM client LEFT JOIN player ON client.id = player.client_id " +
-						"WHERE client.id = $1 AND player.room_id = $2", cid, roomId).Scan(&name, &picture, &pid)
+	err := db.QueryRow("SELECT name, picture, player.id player.color_scheme FROM client LEFT JOIN player ON client.id = player.client_id " +
+						"WHERE client.id = $1 AND player.room_id = $2", cid, roomId).Scan(&name, &picture, &pid, &scheme)
 
 	if err != nil && err != sql.ErrNoRows {
 		log.Println("GetProfileRoom: ", err)

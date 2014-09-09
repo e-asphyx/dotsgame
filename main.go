@@ -91,6 +91,7 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 func Login(w http.ResponseWriter, req *http.Request) {
 	session, _ := store.Get(req, "session")
 
+	/* Backdoor for test users */
 	if token := req.FormValue("token"); token != "" {
 		/* Test user login */
 		cid, err := db.VerifyToken(token)
@@ -228,6 +229,7 @@ type UserProfile struct {
 	Name string `json:"name"`
 	Picture string `json:"picture"`
 	Player uint64 `json:"player,omitempty"`
+	Scheme string `json:"scheme,omitempty"`
 }
 
 func GetUser(req *http.Request) (interface{}, error) {
@@ -329,7 +331,7 @@ func WebSocketServer(ws *websocket.Conn) {
 					return
 				}
 				/* skip unmarshalling errors */
-			} else if msg.CID == cid {
+			} else {
 				incoming <- msg
 			}
 		}
@@ -351,7 +353,10 @@ func WebSocketServer(ws *websocket.Conn) {
 		select {
 		case msg, ok := <-incoming:
 			if !ok {return}
+
+			msg.CID = cid
 			msg.roomId = roomId
+
 			room.Post(msg)
 			timer.Reset(time.Second * keepAliveInterval)
 

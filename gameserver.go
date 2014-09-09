@@ -18,6 +18,10 @@ type GameMessage struct {
 
 	Points map[string][]Point `json:"p,omitempty"`
 	Areas map[string][][]Point `json:"a,omitempty"`
+
+	/* TODO */
+	Players map[string]string `json:"pl,omitempty"`
+	Leave []uint64 `json:"lv,omitempty"`
 }
 
 type Client struct {
