@@ -29,15 +29,23 @@ p {
 	display: none;
 	position: absolute;
 	top: 100%;
-	right: 0;
 	z-index: 100;
 	background: #ddd0b6;
 	border-radius: 0.4em;
 	box-sizing: border-box;
 	padding: 0.6em;
 	margin: 0.6em 0 0 0;
-	float: right;
 	box-shadow: 0.1em 0.1em 0.5em 0.2em rgba(0,0,0,.2);
+}
+
+.dropdown-container.left {
+	right: 0;
+	float: right;
+}
+
+.dropdown-container.right {
+	left: 0;
+	float: left;
 }
 
 .button {

@@ -517,23 +517,31 @@ var game = {};
 	}
 
 	App.prototype = {
+		/* Flags*/
+		FL_KEEPALIVE: 0x1,
+			
 		randomScheme: function() {
 			var styles = _.difference(_.keys(this.style.schemes), _.values(this.players));
 			if(styles.length != 0) {
 				return styles[Math.round(Math.random() * (styles.length - 1))];
 			}
-			
+		
+			/* TODO: limit players number */
 			console.log("No schemes left!");
 		},
 
 		onMessage: function(evt) {
 			var msg = JSON.parse(event.data);
-			console.log(msg);
+			if(!(msg.fl & this.FL_KEEPALIVE)) console.log(msg);
 
-			if(msg.pl) {
+			if(msg.players) {
 				/* TODO notify */
-				_.each(msg.pl, function(scheme, cid) {
-					this.players[cid] = (scheme != "" ? scheme : this.randomScheme());
+				_.each(msg.players, function(scheme, cid) {
+					if(scheme != "") {
+						this.players[cid] = scheme;
+					} else if(this.players[cid] == undefined) {
+						this.players[cid] = this.randomScheme();
+					}
 				}, this);
 			}
 
@@ -559,7 +567,7 @@ var game = {};
 				}, this);
 			}
 			
-			if(msg.p || msg.a) this.renderGame();
+			if(msg.p || msg.a || msg.players) this.renderGame();
 		},
 
 		displayAlert: function(msg) {
@@ -790,8 +798,12 @@ var game = {};
 					}, this);
 					if(upd) this.renderGame();
 				}
-				this.conn.send(JSON.stringify(msg));
+				this.sendMsg(msg);
 			}
+		},
+
+		sendMsg: function(msg) {
+			this.conn.send(JSON.stringify(msg));
 		},
 
 		pointSurrounded: function(pos, cid) {

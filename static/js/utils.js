@@ -4,6 +4,8 @@ $(document).ready(function() {
 		var container = $(".dropdown-container");
 
 		if(!container.is(evt.target) && container.has(evt.target).length == 0) {
+   			evt.preventDefault();
+
 			var opened = $(evt.currentTarget).hasClass("open");
 			$(".dropdown").removeClass("open"); /* close others */
 			$(evt.currentTarget).toggleClass("open", !opened);

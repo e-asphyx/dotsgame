@@ -19,9 +19,8 @@ type GameMessage struct {
 	Points map[string][]Point `json:"p,omitempty"`
 	Areas map[string][][]Point `json:"a,omitempty"`
 
-	/* TODO */
-	Players map[string]string `json:"pl,omitempty"`
-	Leave []uint64 `json:"lv,omitempty"`
+	Players map[string]string `json:"players,omitempty"`
+	Leave []uint64 `json:"leave,omitempty"`
 }
 
 type Client struct {
@@ -66,7 +65,7 @@ func (srv *GameServer) gameServer() {
 			hist, err := db.LoadHistory(srv.roomId)
 			if err != nil {
 				log.Printf("db.LoadHistory: %s\n", err.Error())
-			} else if len(hist.Points) != 0 || len(hist.Areas) != 0 {
+			} else if len(hist.Points) != 0 || len(hist.Areas) != 0 || len(hist.Players) != 0 {
 				cl.msg <- hist
 			}
 
@@ -83,6 +82,7 @@ func (srv *GameServer) gameServer() {
 			if err := db.PostHistory(msg); err != nil {
 				log.Printf("db.PostHistory: %s\n", err.Error())
 			}
+			/* TODO leave */
 
 			for e := clients.Front(); e != nil; e = e.Next() {
 				client := e.Value.(*Client)
