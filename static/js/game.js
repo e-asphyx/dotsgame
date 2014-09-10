@@ -520,6 +520,14 @@ window.Controllers = window.Controllers || {};
 		this.renderGame();
 		this.setupConn();
 		this.canvas.click(_.bind(this.canvasClick, this));
+
+		var self = this;
+		$(window).unload(function() {
+			if(self.conn) {
+				delete self.conn.onclose;
+				self.conn.close();
+			}
+		});
 	};
 
 	_.extend(Game.App.prototype, Backbone.Events, {
