@@ -358,6 +358,7 @@ func WebSocketServer(ws *websocket.Conn) {
 
 			msg.CID = cid
 			msg.roomId = roomId
+			msg.sender = client
 
 			room.Post(msg)
 			timer.Reset(time.Second * keepAliveInterval)

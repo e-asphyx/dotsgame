@@ -12,6 +12,7 @@ type Point struct {
 
 type GameMessage struct {
 	roomId uint64 `json:"-"`
+	sender *Client `json:"-"`
 
 	CID uint64 `json:"cid"`
 	Flags uint `json:"fl"`
@@ -87,7 +88,7 @@ func (srv *GameServer) gameServer() {
 			for e := clients.Front(); e != nil; e = e.Next() {
 				client := e.Value.(*Client)
 
-				if client.cid != msg.CID {
+				if msg.sender != client {
 					client.msg <- msg
 				}
 			}
