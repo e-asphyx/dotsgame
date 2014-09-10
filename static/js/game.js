@@ -1,6 +1,8 @@
-var game = {};
+window.Game = {};
+window.Controllers = window.Controllers || {};
+
 (function() {
-	game.style = {
+	Game.style = {
 		board: {
 			padding: 6.0,
 			grid: {
@@ -103,7 +105,7 @@ var game = {};
 			var idx = this._idx();
 			this.list.splice(idx, 1);
 			if(this.list.length) {
-				return this.list[idx < this.list.length ? idx : 0]
+				return this.list[idx < this.list.length ? idx : 0];
 			}
 		},
 
@@ -140,7 +142,7 @@ var game = {};
 			/* return valid link to copy of self */
 			return list[this._idx()];
 		}
-	}
+	};
 
 	function VacuumWrap(points) {
 		this.points = points;
@@ -356,12 +358,13 @@ var game = {};
 				}
 
 				/* maybe split */
-				var opposite;
-				if(opposite = band.token.find(function(node){
+				var opposite = band.token.find(function(node){
 					return node != band.token &&
 						node.val.x == band.token.val.x &&
 						node.val.y == band.token.val.y;
-				}, this)) {
+				}, this);
+				
+				if(opposite) {
 					var tmp = [];
 					while(opposite != band.token) {
 						tmp.push(opposite.val);
@@ -384,6 +387,7 @@ var game = {};
 				var outp = this.getHour(band.token.val, band.token.next().val);
 				var angle = (inp - outp) & 0x7;
 
+				var nb, newNode, clone;
 				if(!this.mapAt(band.token.val)) {
 					if(inp < 0 || outp < 0) {
 						/* same node, reduce */
@@ -393,10 +397,10 @@ var game = {};
 						return;
 					}
 
-					if(angle == 0 || (angle < 3 &&
+					if(angle === 0 || (angle < 3 &&
 							(!this.isDiag(band.token.prev().val, band.token.val) ||
 							!this.isDiag(band.token.val, band.token.next().val)))) {
-						var clone = band.token.deepClone();
+						clone = band.token.deepClone();
 						var r = clone.remove();
 
 						if(!this.checkIntersect(clone, r)) {
@@ -411,13 +415,13 @@ var game = {};
 					/* Analyze inner neighbors */
 					/* (maybe) move */
 					for(i = 0; i < angle - 1; i++) {
-					var nb = (outp + i + 1) & 0x7;
-						var newNode = this.getNthNeighbor(band.token.val, nb);
+						nb = (outp + i + 1) & 0x7;
+						newNode = this.getNthNeighbor(band.token.val, nb);
 
 						if(this.isNeighbors(newNode, band.token.prev().val) &&
 								this.isNeighbors(newNode, band.token.next().val)) {
 
-							var clone = band.token.deepClone();
+							clone = band.token.deepClone();
 							clone.val = newNode;
 
 							if(!this.checkIntersect(clone, clone)) {
@@ -438,8 +442,8 @@ var game = {};
 						!this.mapAt(band.token.prev().val)) {
 
 					for(i = 0; i < angle - 1; i++) {
-						var nb = (outp + i + 1) & 0x7;
-						var newNode = this.getNthNeighbor(band.token.val, nb);
+						nb = (outp + i + 1) & 0x7;
+						newNode = this.getNthNeighbor(band.token.val, nb);
 
 						/* check intersection */
 						if(this.isNeighbors(newNode, band.token.prev().val) &&
@@ -448,7 +452,7 @@ var game = {};
 								!this.canInflate(band.token.prev().val, newNode) &&
 								!this.canInflate(newNode, band.token.val)) {
 
-							var clone = band.token.deepClone();
+							clone = band.token.deepClone();
 							var n = clone.before(newNode);
 
 							if(!this.checkIntersect(clone, n)) {
@@ -486,9 +490,9 @@ var game = {};
 		_.each(lst, function(obj) {
 			this[obj.cid] = obj.data;
 		}, this);
-	};
+	}
 
-	App = game.App = function(options) {
+	Game.App = function(options) {
 		_.extend(this, _.pick(options, ["style", "xnodes", "ynodes"]));
 
 		this.cid = window.AuthData.ID;
@@ -500,6 +504,8 @@ var game = {};
 
 		this.canvas.attr("height", Math.round(this.canvasH + this.style.board.padding * 2 + 1));
 		ensureHIDPI(this.canvas.get(0));
+
+		this.freeNodes = this.xnodes * this.ynodes;
 
 		this.points = {};
 		this.areas = {};
@@ -514,15 +520,15 @@ var game = {};
 		this.renderGame();
 		this.setupConn();
 		this.canvas.click(_.bind(this.canvasClick, this));
-	}
+	};
 
-	App.prototype = {
+	_.extend(Game.App.prototype, Backbone.Events, {
 		/* Flags*/
 		FL_KEEPALIVE: 0x1,
 			
 		randomScheme: function() {
 			var styles = _.difference(_.keys(this.style.schemes), _.values(this.players));
-			if(styles.length != 0) {
+			if(styles.length !== 0) {
 				return styles[Math.round(Math.random() * (styles.length - 1))];
 			}
 		
@@ -535,13 +541,18 @@ var game = {};
 			if(!(msg.fl & this.FL_KEEPALIVE)) console.log(msg);
 
 			if(msg.players) {
-				/* TODO notify */
 				_.each(msg.players, function(scheme, cid) {
-					if(scheme != "") {
+					if(scheme !== "") {
 						this.players[cid] = scheme;
-					} else if(this.players[cid] == undefined) {
+					} else if(this.players[cid] === undefined) {
 						this.players[cid] = this.randomScheme();
 					}
+					
+					/* Notify */
+					this.trigger("change:player", {
+						id: Number(cid),
+						scheme: this.players[cid]
+					});
 				}, this);
 			}
 
@@ -567,6 +578,7 @@ var game = {};
 				}, this);
 			}
 			
+			if(msg.p || msg.a) this.updFreeNodes();
 			if(msg.p || msg.a || msg.players) this.renderGame();
 		},
 
@@ -798,6 +810,7 @@ var game = {};
 					}, this);
 					if(upd) this.renderGame();
 				}
+				this.updFreeNodes();
 				this.sendMsg(msg);
 			}
 		},
@@ -810,10 +823,21 @@ var game = {};
 			return this.areasMaps[cid] ? !!this.areasMaps[cid][pos.y][pos.x] : false;
 		},
 
-		addPoint: function(pos, cid, options) {
-			options = options || {};
-			this.points[cid] = this.points[cid] || [];
+		updFreeNodes: function() {
+			var x, y, free = 0;
+			for(y = 0; y < this.ynodes; y++) {
+				for(x = 0; x < this.xnodes; x++) {
+					if(this.ensureFreeNode({x: x, y: y})) free++;
+				}
+			}
 
+			if(free != this.freeNodes) {
+				this.freeNodes = free;
+				this.trigger("change:free", free);
+			}
+		},
+
+		ensureFreeNode: function(pos) {
 			if(_.some(this.points, function(points) {
 					return _.some(points, function(p){return p.x == pos.x && p.y == pos.y;});
 				})) {
@@ -823,6 +847,15 @@ var game = {};
 			if(_.some(this.areas, function(bands, cid){return this.pointSurrounded(pos, cid);}, this)) {
 				return false;
 			}
+
+			return true;
+		},
+
+		addPoint: function(pos, cid, options) {
+			options = options || {};
+			this.points[cid] = this.points[cid] || [];
+
+			if(!this.ensureFreeNode(pos)) return false;
 
 			var updateNeeded = false;
 			_.times(8, function(n) {
@@ -852,7 +885,7 @@ var game = {};
 		canvasClick: function(evt) {
 			var offsetX, offsetY;
 
-			if(evt.offsetX != undefined) {
+			if(evt.offsetX !== undefined) {
 				offsetX = evt.offsetX;
 				offsetY = evt.offsetY;
 			} else {
@@ -871,7 +904,20 @@ var game = {};
 				});
 			}
 		},
-	};
+
+		getFreeNodes: function() {
+			return this.freeNodes;
+		},
+		
+		getPlayers: function() {
+			return _.map(this.players, function(scheme, cid) {
+				return {
+					id: Number(cid),
+					scheme: scheme
+				};
+			});
+		}
+	});
 
 	function ensureHIDPI(canvas) {
 		var context = canvas.getContext('2d');
@@ -906,13 +952,43 @@ var game = {};
 			context.scale(ratio, ratio);
 		}
 	}
+
+	window.Controllers.GameController = function() {
+		this.game = new Game.App({
+			style: Game.style,
+			xnodes: 40,
+			ynodes: 30,
+		});
+		
+		this.listenTo(this.game, "change:player", this.playerChange);
+		this.listenTo(this.game, "change:free", this.freeChange);
+
+		/* "Left" indicator */
+		this.freeNodes = new Backbone.Model({value: this.game.getFreeNodes()});
+		this.freeNodesView = new Views.NumericIndicator({
+			title: "Left",
+			model: this.freeNodes
+		});
+		$("#indicators").prepend(this.freeNodesView.render().el);
+
+		/* Users */
+		this.players = new Collections.Users(this.game.getPlayers());
+		this.players.fetch();
+	};
+	_.extend(Controllers.GameController.prototype, Backbone.Events, {
+		playerChange: function(p) {
+			var m = new Models.User(p);
+			this.players.set(m);
+			m.fetch(); /* update */
+		},
+		
+		freeChange: function(n) {
+			this.freeNodes.set({value: n});
+		}
+	});
 	
 })();
 
 $(document).ready(function(){
-	window.app = new game.App({
-		style: game.style,
-		xnodes: 40,
-		ynodes: 30,
-	});
+	window.app = new Controllers.GameController();
 });

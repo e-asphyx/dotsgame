@@ -314,10 +314,11 @@ func (db *PQProxy) GetPlayerProfile(cid, roomId uint64) (*UserProfile, error) {
 	var (
 		name, picture, scheme sql.NullString
 		pid uint64
+		ts time.Time
 	)
 
-	err := db.QueryRow("SELECT name, picture, player.id, player.color_scheme FROM client LEFT JOIN player ON client.id = player.client_id " +
-						"WHERE client.id = $1 AND player.room_id = $2", cid, roomId).Scan(&name, &picture, &pid, &scheme)
+	err := db.QueryRow("SELECT name, picture, player.id, color_scheme, timestamp FROM client LEFT JOIN player ON client.id = player.client_id " +
+						"WHERE client.id = $1 AND player.room_id = $2", cid, roomId).Scan(&name, &picture, &pid, &scheme, &ts)
 
 	if err != nil && err != sql.ErrNoRows {
 		log.Println("GetProfileRoom: ", err)
@@ -329,6 +330,7 @@ func (db *PQProxy) GetPlayerProfile(cid, roomId uint64) (*UserProfile, error) {
 		Picture: picture.String,
 		Player: pid,
 		Scheme: scheme.String,
+		Timestamp: ts,
 	}
 
 	return &profile, err
@@ -337,7 +339,7 @@ func (db *PQProxy) GetPlayerProfile(cid, roomId uint64) (*UserProfile, error) {
 func (db *PQProxy) GetPlayers(roomId uint64) ([]UserProfile, error) {
 	var result []UserProfile
 
-	rows, err := db.Query("SELECT client.id, name, picture, player.id, player.color_scheme FROM client LEFT JOIN player ON client.id = player.client_id " +
+	rows, err := db.Query("SELECT client.id, name, picture, player.id, color_scheme, timestamp FROM client LEFT JOIN player ON client.id = player.client_id " +
 						"WHERE player.room_id = $1 ORDER BY timestamp", roomId)
 
 	if err != nil {return nil, err}
@@ -347,9 +349,10 @@ func (db *PQProxy) GetPlayers(roomId uint64) ([]UserProfile, error) {
 		var (
 			name, picture, scheme sql.NullString
 			cid, pid uint64
+			ts time.Time
 		)
 
-		err = rows.Scan(&cid, &name, &picture, &pid, &scheme)
+		err = rows.Scan(&cid, &name, &picture, &pid, &scheme, &ts)
 		if err != nil {return nil, err}
 
 		result = append(result, UserProfile {
@@ -358,6 +361,7 @@ func (db *PQProxy) GetPlayers(roomId uint64) ([]UserProfile, error) {
 			Picture: picture.String,
 			Player: pid,
 			Scheme: scheme.String,
+			Timestamp: ts,
 		})
 	}
 

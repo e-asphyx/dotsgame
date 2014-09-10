@@ -229,6 +229,7 @@ type UserProfile struct {
 	Picture string `json:"picture"`
 	Player uint64 `json:"player,omitempty"`
 	Scheme string `json:"scheme,omitempty"`
+	Timestamp time.Time `json:"timestamp,omitempty"`
 
 	/* TODO: Facebook profile */
 }
