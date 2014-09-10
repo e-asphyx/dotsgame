@@ -11,7 +11,7 @@ window.Controllers = window.Controllers || {};
 		},
 
 		render: function() {
-			this.$el.html(this.template(this.model.toJSON()));
+			this.$el.html(this.template({o: this.model.toJSON()}));
 			return this;
     	}
 	});

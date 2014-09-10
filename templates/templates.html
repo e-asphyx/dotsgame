@@ -2,13 +2,13 @@
 	<!-- Top-right menu -->
 	<script type="text/template" id="user-profile-template">
 		<div class="dropdown">
-			<a href="#"><div class="user-picture" <%if(typeof picture !== "undefined"){%> style="background-image: url('<%= picture %>');"<%}%>></div></a>
+			<a href="#"><div class="user-picture" style="background-image: url('<%= o.picture || "/static/images/user.svg" %>');"></div></a>
 			<div class="dropdown-container left">
 				<div class="profile-flexbox">
-					<div class="profile-user-picture flexbox-item"<%if(typeof picture !== "undefined"){%> style="background-image: url('<%= picture %>');"<%}%>>
+					<div class="profile-user-picture flexbox-item" style="background-image: url('<%= o.picture || "/static/images/user.svg" %>');">
 					</div>
 					<div class="flexbox-item">
-						<p><%if(typeof name !== "undefined"){%><%- name %><%}%></p>
+						<p><%- o.name || ("#" + o.id) %></p>
 						<a class="button btn-dark" href="/logout">Logout</a>
 					</div>
 				</div>
