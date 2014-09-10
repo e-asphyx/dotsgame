@@ -537,7 +537,7 @@ window.Controllers = window.Controllers || {};
 		},
 
 		onMessage: function(evt) {
-			var msg = JSON.parse(event.data);
+			var msg = JSON.parse(evt.data);
 			if(!(msg.fl & this.FL_KEEPALIVE)) console.log(msg);
 
 			if(msg.players) {
