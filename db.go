@@ -71,6 +71,20 @@ func (db *PQProxy) NewRoom(uid string) (uint64, error) {
 }
 
 func (db *PQProxy) PostHistory(msg *GameMessage) error {
+	/* Add or modify player */
+	for cid, scheme := range msg.Players {
+		res, err := db.Exec("UPDATE player SET color_scheme = $1 WHERE room_id = $2 AND client_id = $3", scheme, msg.roomId, cid)
+		if err != nil {return err}
+
+		if affected, _ := res.RowsAffected(); affected == 0 {
+			_, err = db.Exec("INSERT INTO player (room_id, client_id, color_scheme) " +
+								"VALUES ($1, $2, $3) RETURNING id", msg.roomId, cid, scheme)
+			if err != nil {return err}
+		}
+	}
+
+	/* TODO leave */
+
 	/* Insert point(s) */
 	for cid, points := range msg.Points {
 		for _, p := range points {
@@ -86,7 +100,7 @@ func (db *PQProxy) PostHistory(msg *GameMessage) error {
 		if err != nil {return err}
 
 		if affected, _ := res.RowsAffected(); affected == 0 {
-			_, err := db.Exec("INSERT INTO area (room_id, cid, area) VALUES ($1, $2, $3)", msg.roomId, cid, jsondata)
+			_, err = db.Exec("INSERT INTO area (room_id, cid, area) VALUES ($1, $2, $3)", msg.roomId, cid, jsondata)
 			if err != nil {return err}
 		}
 	}
@@ -98,11 +112,33 @@ func (db *PQProxy) LoadHistory(id uint64) (*GameMessage, error) {
 	msg := GameMessage {
 		Points: make(map[string][]Point),
 		Areas: make(map[string][][]Point),
+		Players: make(map[string]string),
 		roomId: id,
 	}
 
+	/* Load players */
+	rows, err := db.Query("SELECT client.id, player.color_scheme FROM client LEFT JOIN player ON client.id = player.client_id " +
+						"WHERE player.room_id = $1 ORDER BY timestamp", id)
+
+	if err != nil {return nil, err}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			scheme sql.NullString
+			cid string
+		)
+
+		err = rows.Scan(&cid, &scheme)
+		if err != nil {return nil, err}
+
+		msg.Players[cid] = scheme.String
+	}
+	err = rows.Err()
+	if err != nil {return nil, err}
+
 	/* Load points */
-	rows, err := db.Query("SELECT cid, x, y FROM point WHERE room_id=$1", id)
+	rows, err = db.Query("SELECT cid, x, y FROM point WHERE room_id=$1", id)
 	if err != nil {return nil, err}
 	defer rows.Close()
 
@@ -278,10 +314,11 @@ func (db *PQProxy) GetPlayerProfile(cid, roomId uint64) (*UserProfile, error) {
 	var (
 		name, picture, scheme sql.NullString
 		pid uint64
+		ts time.Time
 	)
 
-	err := db.QueryRow("SELECT name, picture, player.id player.color_scheme FROM client LEFT JOIN player ON client.id = player.client_id " +
-						"WHERE client.id = $1 AND player.room_id = $2", cid, roomId).Scan(&name, &picture, &pid, &scheme)
+	err := db.QueryRow("SELECT name, picture, player.id, color_scheme, timestamp FROM client LEFT JOIN player ON client.id = player.client_id " +
+						"WHERE client.id = $1 AND player.room_id = $2", cid, roomId).Scan(&name, &picture, &pid, &scheme, &ts)
 
 	if err != nil && err != sql.ErrNoRows {
 		log.Println("GetProfileRoom: ", err)
@@ -292,6 +329,8 @@ func (db *PQProxy) GetPlayerProfile(cid, roomId uint64) (*UserProfile, error) {
 		Name: name.String,
 		Picture: picture.String,
 		Player: pid,
+		Scheme: scheme.String,
+		Timestamp: ts,
 	}
 
 	return &profile, err
@@ -300,19 +339,20 @@ func (db *PQProxy) GetPlayerProfile(cid, roomId uint64) (*UserProfile, error) {
 func (db *PQProxy) GetPlayers(roomId uint64) ([]UserProfile, error) {
 	var result []UserProfile
 
-	rows, err := db.Query("SELECT client.id, name, picture, player.id FROM client LEFT JOIN player ON client.id = player.client_id " +
-						"WHERE player.room_id = $1", roomId)
+	rows, err := db.Query("SELECT client.id, name, picture, player.id, color_scheme, timestamp FROM client LEFT JOIN player ON client.id = player.client_id " +
+						"WHERE player.room_id = $1 ORDER BY timestamp", roomId)
 
 	if err != nil {return nil, err}
 	defer rows.Close()
 
 	for rows.Next() {
 		var (
-			name, picture sql.NullString
+			name, picture, scheme sql.NullString
 			cid, pid uint64
+			ts time.Time
 		)
 
-		err = rows.Scan(&cid, &name, &picture, &pid)
+		err = rows.Scan(&cid, &name, &picture, &pid, &scheme, &ts)
 		if err != nil {return nil, err}
 
 		result = append(result, UserProfile {
@@ -320,6 +360,8 @@ func (db *PQProxy) GetPlayers(roomId uint64) ([]UserProfile, error) {
 			Name: name.String,
 			Picture: picture.String,
 			Player: pid,
+			Scheme: scheme.String,
+			Timestamp: ts,
 		})
 	}
 

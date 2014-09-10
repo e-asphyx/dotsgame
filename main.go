@@ -76,7 +76,6 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 	}
 
 	/* First player */
-	/* TODO color scheme */
 	pid, err := db.NewPlayer(roomId, cid, "");
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -230,6 +229,9 @@ type UserProfile struct {
 	Picture string `json:"picture"`
 	Player uint64 `json:"player,omitempty"`
 	Scheme string `json:"scheme,omitempty"`
+	Timestamp time.Time `json:"timestamp,omitempty"`
+
+	/* TODO: Facebook profile */
 }
 
 func GetUser(req *http.Request) (interface{}, error) {

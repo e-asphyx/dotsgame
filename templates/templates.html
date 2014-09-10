@@ -2,16 +2,23 @@
 	<!-- Top-right menu -->
 	<script type="text/template" id="user-profile-template">
 		<div class="dropdown">
-			<div class="user-picture" <%if(picture != ""){%> style="background-image: url('<%= picture %>');"<%}%>></div>
-			<div class="dropdown-container">
+			<a href="#"><div class="user-picture" style="background-image: url('<%= o.picture || "/static/images/user.svg" %>');"></div></a>
+			<div class="dropdown-container left">
 				<div class="profile-flexbox">
-					<div class="profile-user-picture flexbox-item"<%if(picture != ""){%> style="background-image: url('<%= picture %>');"<%}%>></div>
+					<div class="profile-user-picture flexbox-item" style="background-image: url('<%= o.picture || "/static/images/user.svg" %>');">
+					</div>
 					<div class="flexbox-item">
-						<p><%- name %></p>
-						<a class="button" href="/logout">Logout</a>
+						<p><%- o.name || ("#" + o.id) %></p>
+						<a class="button btn-dark" href="/logout">Logout</a>
 					</div>
 				</div>
 			</div>
 		</div>
+	</script>
+
+	<!-- Numeric indicator -->
+	<script type="text/template" id="numeric-indicator-template">
+		<div class="caption"><%= title %></div>
+		<div class="label"><%- value %></div>
 	</script>
 {{end}}
