@@ -25,6 +25,10 @@ input, select, textarea, button {
 	font-family: inherit;
 }
 
+a:active {
+	outline: none;
+}
+
 .dropdown {
 	position: relative;
 }
@@ -64,9 +68,12 @@ input, select, textarea, button {
 	font-size: 1em;
 	color: #fff9ed;
 	text-align: center;
-	cursor: default;
 	box-sizing: border-box;
 	margin: 0.1em;
+}
+
+div.button {
+	cursor: default;
 }
 
 .button>.caption {

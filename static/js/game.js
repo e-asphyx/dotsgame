@@ -520,14 +520,6 @@ window.Controllers = window.Controllers || {};
 		this.renderGame();
 		this.setupConn();
 		this.canvas.click(_.bind(this.canvasClick, this));
-
-		var self = this;
-		$(window).unload(function() {
-			if(self.conn) {
-				delete self.conn.onclose;
-				self.conn.close();
-			}
-		});
 	};
 
 	_.extend(Game.App.prototype, Backbone.Events, {
@@ -924,6 +916,13 @@ window.Controllers = window.Controllers || {};
 					scheme: scheme
 				};
 			});
+		},
+
+		destroy: function() {
+			if(this.conn && this.conn.readyState == WebSocket.OPEN) {
+				this.conn.onclose = null;
+				this.conn.close();
+			}
 		}
 	});
 
@@ -966,6 +965,11 @@ window.Controllers = window.Controllers || {};
 			style: Game.style,
 			xnodes: 40,
 			ynodes: 30,
+		});
+		
+		var self = this;
+		$(window).on('beforeunload', function() {
+			self.game.destroy();
 		});
 		
 		this.listenTo(this.game, "change:player", this.playerChange);
