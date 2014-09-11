@@ -1,3 +1,7 @@
+function modalToggle(selector, opened) {
+	$(selector).toggleClass("open", opened);
+}
+
 $(document).ready(function() {
 	/* Dropdown helper */
 	$("body").on("click", ".dropdown", function(evt) {
@@ -17,6 +21,20 @@ $(document).ready(function() {
 
 		if(!dropdown.is(evt.target) && dropdown.has(evt.target).length === 0) {
 			dropdown.removeClass("open");
+		}
+	});
+
+	/* Modal helper */
+	$("a.modal-close").click(function(evt) {
+   		evt.preventDefault();
+		$(evt.target).closest(".modal").removeClass("open");
+	});
+
+	$(".modal").click(function(evt) {
+		var body = $(".modal-content");
+
+		if(!body.is(evt.target) && body.has(evt.target).length === 0) {
+			$(evt.target).closest(".modal").removeClass("open");
 		}
 	});
 });
