@@ -32,6 +32,7 @@ const (
 var (
 	templates = template.Must(template.ParseFiles(templatesRoot + "head.html",
 													templatesRoot + "login.html",
+													templatesRoot + "opengraph.html",
 													templatesRoot + "templates.html",
 													templatesRoot + templateMain))
 
