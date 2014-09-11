@@ -4,6 +4,7 @@ import (
 	"os"
 	"log"
 	"time"
+	"strconv"
 	"database/sql"
 	"encoding/json"
 	_ "github.com/lib/pq"
@@ -11,7 +12,9 @@ import (
 
 type DBProxy interface {
 	RoomId(uid string) (uint64, error)
+	RoomUID(id uint64) (string, error)
 	NewRoom(uid string) (uint64, error)
+
 	NewPlayer(roomId, cid uint64, scheme string) (uint64, error)
 	GetPlayer(roomId, cid uint64) (uint64, error)
 
@@ -25,6 +28,7 @@ type DBProxy interface {
 	SaveSession(sid, name string, data string) error
 
 	NewInvitation(roomId uint64, token string) (uint64, error)
+	AcceptInvitation(token string) (uint64, error)
 
 	SyncUser(cid uint64, name, picture, token string, expires time.Time) error
 	GetUserProfile(cid uint64) (*UserProfile, error)
@@ -55,8 +59,14 @@ func NewPQProxy() (*PQProxy, error) {
 
 func (db *PQProxy) RoomId(uid string) (uint64, error) {
 	var roomId uint64
-	err := db.QueryRow("SELECT id FROM room WHERE uid=$1", uid).Scan(&roomId)
+	err := db.QueryRow("SELECT id FROM room WHERE uid = $1", uid).Scan(&roomId)
 	return roomId, err
+}
+
+func (db *PQProxy) RoomUID(id uint64) (string, error) {
+	var uid string
+	err := db.QueryRow("SELECT uid FROM room WHERE id = $1", id).Scan(&uid)
+	return uid, err
 }
 
 func (db *PQProxy) NewRoom(uid string) (uint64, error) {
@@ -241,6 +251,41 @@ func (db *PQProxy) NewInvitation(roomId uint64, token string) (uint64, error) {
 	return id, err
 }
 
+func (db *PQProxy) AcceptInvitation(token string) (uint64, error) {
+	var roomId, id uint64
+
+	tx, err := db.Begin()
+	if err != nil {
+		log.Println("AcceptInvitation: ", err)
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	err = tx.QueryRow("SELECT id, room_id FROM invitation WHERE code = $1 AND used != TRUE", token).Scan(&id, &roomId)
+
+	if err != nil {
+		if err != sql.ErrNoRows {
+			log.Println("AcceptInvitation: ", err)
+		}
+		return 0, err
+	}
+
+	/* Invalidate */
+	_, err = tx.Exec("UPDATE invitation SET used = TRUE WHERE id = $1", id)
+	if err != nil {
+		log.Println("AcceptInvitation: ", err)
+		return 0, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Println("AcceptInvitation: ", err)
+		return 0, err
+	}
+
+	return roomId, err
+}
+
 func (db *PQProxy) LoadSession(sid string, name string) (string, error) {
 	var data string
 	/*err := db.QueryRow("SELECT data FROM session WHERE sid = $1 AND name = $2 AND CURRENT_TIMESTAMP - timestamp < ttl", sid, name).Scan(&data)*/
@@ -302,7 +347,7 @@ func (db *PQProxy) GetUserProfile(cid uint64) (*UserProfile, error) {
 	}
 
 	profile := UserProfile {
-		ID: cid,
+		ID: strconv.FormatUint(cid, 10),
 		Name: name.String,
 		Picture: picture.String,
 	}
@@ -325,7 +370,7 @@ func (db *PQProxy) GetPlayerProfile(cid, roomId uint64) (*UserProfile, error) {
 	}
 
 	profile := UserProfile {
-		ID: cid,
+		ID: strconv.FormatUint(cid, 10),
 		Name: name.String,
 		Picture: picture.String,
 		Player: pid,
@@ -356,7 +401,7 @@ func (db *PQProxy) GetPlayers(roomId uint64) ([]UserProfile, error) {
 		if err != nil {return nil, err}
 
 		result = append(result, UserProfile {
-			ID: cid,
+			ID: strconv.FormatUint(cid, 10),
 			Name: name.String,
 			Picture: picture.String,
 			Player: pid,

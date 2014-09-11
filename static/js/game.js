@@ -550,7 +550,7 @@ window.Controllers = window.Controllers || {};
 					
 					/* Notify */
 					this.trigger("change:player", {
-						id: Number(cid),
+						id: String(cid),
 						scheme: this.players[cid]
 					});
 				}, this);
@@ -912,7 +912,7 @@ window.Controllers = window.Controllers || {};
 		getPlayers: function() {
 			return _.map(this.players, function(scheme, cid) {
 				return {
-					id: Number(cid),
+					id: String(cid),
 					scheme: scheme
 				};
 			});
@@ -972,9 +972,6 @@ window.Controllers = window.Controllers || {};
 			self.game.destroy();
 		});
 		
-		this.listenTo(this.game, "change:player", this.playerChange);
-		this.listenTo(this.game, "change:free", this.freeChange);
-
 		/* "Left" indicator */
 		this.freeNodes = new Backbone.Model({value: this.game.getFreeNodes()});
 		this.freeNodesView = new Views.NumericIndicator({
@@ -982,16 +979,23 @@ window.Controllers = window.Controllers || {};
 			model: this.freeNodes
 		});
 		$("#indicators").prepend(this.freeNodesView.render().el);
+		this.listenTo(this.game, "change:free", this.freeChange);
 
 		/* Users */
-		this.players = new Collections.Users(this.game.getPlayers());
+		this.players = new Collections.Users();
+		this.listenTo(this.game, "change:player", this.playerChange);
+
+		this.players.set(this.game.getPlayers(), {remove: false});
 		this.players.fetch();
+		
 	};
 	_.extend(Controllers.GameController.prototype, Backbone.Events, {
 		playerChange: function(p) {
-			var m = new Models.User(p);
-			this.players.set(m);
-			m.fetch(); /* update */
+			var model = new Models.User(p);
+			var self = this;
+			model.fetch({success: function(m) {
+				self.players.set(m, {remove: false});
+			}});
 		},
 		
 		freeChange: function(n) {

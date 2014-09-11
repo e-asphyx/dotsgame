@@ -66,6 +66,51 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 
 	cid, _ := getUint64(session.Values["cid"])
 
+	/* invitation code */
+	code, ok := session.Values["code"].(string)
+	if !ok {
+		code = req.FormValue("code")
+
+	} else {
+		delete(session.Values, "code")
+
+		err := session.Save(req, w)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
+	if code != "" {
+		log.Printf("Got invitation code %s\n", code)
+		roomId, err := db.AcceptInvitation(code)
+
+		/* Join to room */
+		if err == nil {
+			uid, err := db.RoomUID(roomId)
+
+			if err == nil {
+				room := Pool.Get(roomId)
+				defer room.Put()
+
+				sync := make(chan bool)
+				msg := GameMessage {
+					CID: cid,
+					roomId: roomId,
+					Players: map[string]string {
+						strconv.FormatUint(cid, 10): "",
+					},
+					sync: sync,
+				}
+
+				room.Post(&msg)
+				<-sync
+
+				http.Redirect(w, req, "/" + uid + "/", http.StatusTemporaryRedirect)
+				return
+			}
+		}
+	}
+
 	/* new room */
 	newUid := randStr(6)
 
@@ -77,7 +122,7 @@ func NewRoom(w http.ResponseWriter, req *http.Request) {
 	}
 
 	/* First player */
-	pid, err := db.NewPlayer(roomId, cid, "");
+	pid, err := db.NewPlayer(roomId, cid, "")
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -124,7 +169,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 
 		newstate, ok := session.Values["state"].(string)
 		if !ok || state != newstate {
-			log.Printf("%s != %s\n", state, newstate);
+			log.Printf("%s != %s\n", state, newstate)
 
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
@@ -225,9 +270,9 @@ func Logout(w http.ResponseWriter, req *http.Request) {
 }
 
 type UserProfile struct {
-	ID uint64 `json:"id,omitempty"`
-	Name string `json:"name"`
-	Picture string `json:"picture"`
+	ID string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+	Picture string `json:"picture,omitempty"`
 	Player uint64 `json:"player,omitempty"`
 	Scheme string `json:"scheme,omitempty"`
 	Timestamp time.Time `json:"timestamp,omitempty"`

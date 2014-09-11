@@ -57,6 +57,16 @@ func (wrapper *AuthWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	cid, ok := getUint64(session.Values["cid"])
 	if !ok || cid == 0 {
+		/* If invitation code is given save it for future use */
+		if code := r.FormValue("code"); code != "" {
+			session.Values["code"] = code
+
+			err := session.Save(r, w)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+
 		/* redirect to login dialog */
 		if wrapper.Redirect != "" {
 			http.Redirect(w, r, wrapper.Redirect, http.StatusTemporaryRedirect)

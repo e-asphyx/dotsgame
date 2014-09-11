@@ -22,6 +22,8 @@ type GameMessage struct {
 
 	Players map[string]string `json:"players,omitempty"`
 	Leave []uint64 `json:"leave,omitempty"`
+
+	sync chan<- bool `json:"-"`
 }
 
 type Client struct {
@@ -84,6 +86,10 @@ func (srv *GameServer) gameServer() {
 				log.Printf("db.PostHistory: %s\n", err.Error())
 			}
 			/* TODO leave */
+
+			if msg.sync != nil {
+				msg.sync <- true
+			}
 
 			for e := clients.Front(); e != nil; e = e.Next() {
 				client := e.Value.(*Client)
