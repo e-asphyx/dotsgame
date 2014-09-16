@@ -41,14 +41,6 @@ window.Controllers = window.Controllers || {};
 		_.extend(this, obj);
 	};
 
-	function RGB(v) {
-		return "rgb(" + v[0] + "," + v[1] + "," + v[2] + ")";
-	}
-
-	function RGBA(v, a) {
-		return "rgba(" + v[0] + "," + v[1] + "," + v[2] + "," + a + ")";
-	}
-
 	function RubberBand(objdata) {
 		if(objdata instanceof Array) {
 			/* Generic consructor */
@@ -647,7 +639,7 @@ window.Controllers = window.Controllers || {};
 			var ctx = this.canvas.get(0).getContext("2d");
 			ctx.save();
 		
-			ctx.fillStyle = RGB(this.style.schemes[scheme]);
+			ctx.fillStyle = Utils.RGB(this.style.schemes[scheme]);
 			
 			ctx.beginPath();
 			ctx.arc(pad + Math.round(point.x * this.gridStep) + 0.5,
@@ -671,8 +663,8 @@ window.Controllers = window.Controllers || {};
 					ctx.save();
 
 					ctx.setStyle(this.style.player.area.style);
-					ctx.strokeStyle = RGB(this.style.schemes[this.players[cid]]);
-					ctx.fillStyle = RGBA(this.style.schemes[this.players[cid]], this.style.player.area.alpha);
+					ctx.strokeStyle = Utils.RGB(this.style.schemes[this.players[cid]]);
+					ctx.fillStyle = Utils.RGBA(this.style.schemes[this.players[cid]], this.style.player.area.alpha);
 
 					ctx.beginPath();
 					ctx.moveTo(

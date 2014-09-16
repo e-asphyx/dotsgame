@@ -171,12 +171,6 @@ div.button {
 	margin-bottom: 1em;
 }
 
-/*
-.main-content>div:last-child {
-	margin-bottom: 0;
-}
-*/
-
 .user-profile {
 	margin: 1em;
 	position: absolute;
@@ -286,10 +280,8 @@ img.icon {
 }
 
 .modal-content {
-	min-width: 20em;
 	background: #ddd0b6;
 	border-radius: 0.4em;
-	box-sizing: border-box;
 	padding: 0.6em;
 	margin: 0;
 	box-shadow: 0.1em 0.1em 0.5em 0.2em rgba(0,0,0,.2);
@@ -322,4 +314,24 @@ img.icon {
 
 a.modal-close {
 	text-decoration: none;
+}
+
+.modal-body {
+	padding-top: 0.6em;
+}
+
+.color-picker {
+	display: flex;
+	flex-wrap: wrap;
+	width: 23em;
+	margin: 0 -0.6em -0.6em 0;
+}
+
+.color-picker-item {
+	display: block;
+	width: 4em;
+	height: 4em;
+	margin: 0 0.6em 0.6em 0;
+	border-radius: 0.4em;
+	background-color: #ffffff;
 }
