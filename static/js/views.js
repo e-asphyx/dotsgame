@@ -69,6 +69,21 @@ window.Controllers = window.Controllers || {};
 			return this;
     	}
 	});
+	
+	Views.PlayersList = Backbone.View.extend({
+		initialize: function() {
+			Utils.Proto(this, "template", _.template($("#players-list-template").html()));
+			
+			this.listenTo(this.collection, "change", this.render);
+			this.listenTo(this.collection, "add", this.render);
+			this.listenTo(this.collection, "remove", this.render);
+		},
+
+		render: function() {
+			this.$el.html(this.template({players: this.collection.toJSON()}));
+			return this;
+    	}
+	});
 
 	$(document).ready(function(){
 		if(window.location.hash && window.location.hash == '#_=_') {

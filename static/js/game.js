@@ -952,7 +952,7 @@ window.Controllers = window.Controllers || {};
 		}
 	}
 
-	window.Controllers.GameController = function() {
+	Controllers.GameController = function() {
 		this.game = new Game.App({
 			style: Game.style,
 			xnodes: 40,
@@ -960,7 +960,7 @@ window.Controllers = window.Controllers || {};
 		});
 		
 		var self = this;
-		$(window).on('beforeunload', function() {
+		$(window).on("beforeunload", function() {
 			self.game.destroy();
 		});
 		
@@ -977,9 +977,22 @@ window.Controllers = window.Controllers || {};
 		this.players = new Collections.Users();
 		this.listenTo(this.game, "change:player", this.playerChange);
 
+		this.playersView = new Views.PlayersList({
+			el: "#players-list-box",
+			collection: this.players
+		});
+		this.playersView.render();
+		
 		this.players.set(this.game.getPlayers(), {remove: false});
 		this.players.fetch();
-		
+
+		/* Color picker */
+		this.colors = new Backbone.Collection();
+		this.colorPicker = new Views.ColorPicker({
+			collection: this.colors,
+			schemes: Game.style.schemes
+		});
+		$("body").append(this.colorPicker.render().el);
 	};
 	_.extend(Controllers.GameController.prototype, Backbone.Events, {
 		playerChange: function(p) {

@@ -8,7 +8,7 @@ html, body {
 	color: #594928;
 	font-family: "Lato", sans-serif;
 	font-size: 1em;
-	height: 100%;
+	min-height: 100%;
 }
 
 h1 {
@@ -40,13 +40,11 @@ a {
 .dropdown-container {
 	display: none;
 	position: absolute;
-	top: 100%;
-	z-index: 100;
+	z-index: 50;
 	background: #ddd0b6;
 	border-radius: 0.4em;
 	box-sizing: border-box;
 	padding: 0.6em;
-	margin: 0.6em 0 0 0;
 	box-shadow: 0.1em 0.1em 0.5em 0.2em rgba(0,0,0,.2);
 }
 
@@ -58,6 +56,16 @@ a {
 .dropdown-container.right {
 	left: 0;
 	float: left;
+}
+
+.dropdown-container.bottom {
+	top: 100%;
+	margin: 0.6em 0 0 0;
+}
+
+.dropdown-container.top {
+	bottom: 100%;
+	margin: 0 0 0.6em 0;
 }
 
 .button {
@@ -164,7 +172,9 @@ div.button {
 
 .main-content-wrapper {
 	display: flex;
+	position: relative;
 	justify-content: center;
+	min-height: 100%;
 }
 
 .main-content>div {
@@ -176,6 +186,7 @@ div.button {
 	position: absolute;
 	right: 0;
 	top: 0;
+	z-index: 10;
 }
 
 .user-menu {
@@ -183,6 +194,7 @@ div.button {
 	position: absolute;
 	left: 0;
 	top: 0;
+	z-index: 10;
 }
 
 .user-picture {
@@ -191,6 +203,30 @@ div.button {
 	border-radius: 50%;
 	background-position: center;
 	background-size: cover;
+}
+
+a.user-picture {
+	display: block;
+}
+
+.user-list-picture {
+	width: 50px;
+	height: 50px;
+	border-radius: 0.4em;
+	background-position: center;
+	background-size: cover;
+}
+
+a.user-list-picture {
+	display: block;
+}
+
+.user-list-item {
+	margin-bottom: 0.6em;
+}
+
+.user-list-item:last-child {
+	margin-bottom: 0;
 }
 
 div.board {
@@ -334,4 +370,15 @@ a.modal-close {
 	margin: 0 0.6em 0.6em 0;
 	border-radius: 0.4em;
 	background-color: #ffffff;
+}
+
+.players-list {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	background: #7f7052;
+	padding: 0.6em;
+	margin: 0.4em 0.4em 1em 0.4em;
+	border-radius: 0.4em;
+	z-index: 10;
 }
