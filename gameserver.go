@@ -54,6 +54,8 @@ type GamePool struct {
 	put chan uint64
 }
 
+/* TODO: report online/offline users */
+
 func (srv *GameServer) gameServer() {
 	clients := list.New()
 

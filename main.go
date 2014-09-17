@@ -188,6 +188,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		var profile struct {
 			ID string `json:"id"`
 			Name string `json:"name"`
+			Link string `json:"link"`
 		}
 
 		err = OAuthCall(transport, GraphAPIProfile, &profile)
@@ -212,7 +213,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		}
 		cid, _ := strconv.ParseUint(profile.ID, 10, 64)
 
-		err = db.SyncUser(cid, profile.Name, picture.Data.Url, tok.AccessToken, tok.Expiry)
+		err = db.SyncUser(cid, profile.Name, picture.Data.Url, tok.AccessToken, profile.Link, tok.Expiry)
 		if err != nil {
 			log.Println(err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -276,8 +277,7 @@ type UserProfile struct {
 	Player uint64 `json:"player,omitempty"`
 	Scheme string `json:"scheme,omitempty"`
 	Timestamp time.Time `json:"timestamp,omitempty"`
-
-	/* TODO: Facebook profile */
+	Link string `json:"link,omitempty"`
 }
 
 func GetUser(req *http.Request) (interface{}, error) {

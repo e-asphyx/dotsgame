@@ -42,12 +42,19 @@
 		<% _.each(players, function(p) { %>
 			<div class="dropdown user-list-item">
 				<a href="#" class="user-list-picture" style="background-image: url('<%= p.picture || "/static/images/user.svg" %>');"></a>
-				<div class="dropdown-container left top">
+				<div class="dropdown-container user-list-dropdown">
 					<div class="profile-flexbox">
-						<div class="profile-user-picture flexbox-item" style="background-image: url('<%= p.picture || "/static/images/user.svg" %>');">
-						</div>
+						<%if(p.link){%><a href="<%= p.link %>" class="flexbox-item" target="_blank"><%}%>
+							<div class="profile-user-picture flexbox-item" style="background-image: url('<%= p.picture || "/static/images/user.svg" %>');">
+							</div>
+						<%if(p.link){%></a><%}%>
+						
 						<div class="flexbox-item">
-							<p><%- p.name || ("#" + p.id) %></p>
+							<p>
+								<%if(p.link){%><a href="<%= p.link %>" target="_blank"><%}%>
+									<%- p.name || ("#" + p.id) %>
+								<%if(p.link){%></a><%}%>
+							</p>
 						</div>
 					</div>
 				</div>
