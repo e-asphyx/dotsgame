@@ -4,6 +4,7 @@ import (
 	"os"
 	"log"
 	"time"
+	"strconv"
 	"database/sql"
 	"encoding/json"
 	_ "github.com/lib/pq"
@@ -11,7 +12,9 @@ import (
 
 type DBProxy interface {
 	RoomId(uid string) (uint64, error)
+	RoomUID(id uint64) (string, error)
 	NewRoom(uid string) (uint64, error)
+
 	NewPlayer(roomId, cid uint64, scheme string) (uint64, error)
 	GetPlayer(roomId, cid uint64) (uint64, error)
 
@@ -25,8 +28,9 @@ type DBProxy interface {
 	SaveSession(sid, name string, data string) error
 
 	NewInvitation(roomId uint64, token string) (uint64, error)
+	AcceptInvitation(token string) (uint64, error)
 
-	SyncUser(cid uint64, name, picture, token string, expires time.Time) error
+	SyncUser(cid uint64, name, picture, token, link string, expires time.Time) error
 	GetUserProfile(cid uint64) (*UserProfile, error)
 	GetPlayerProfile(cid, roomId uint64) (*UserProfile, error)
 	GetPlayers(roomId uint64) ([]UserProfile, error)
@@ -55,8 +59,14 @@ func NewPQProxy() (*PQProxy, error) {
 
 func (db *PQProxy) RoomId(uid string) (uint64, error) {
 	var roomId uint64
-	err := db.QueryRow("SELECT id FROM room WHERE uid=$1", uid).Scan(&roomId)
+	err := db.QueryRow("SELECT id FROM room WHERE uid = $1", uid).Scan(&roomId)
 	return roomId, err
+}
+
+func (db *PQProxy) RoomUID(id uint64) (string, error) {
+	var uid string
+	err := db.QueryRow("SELECT uid FROM room WHERE id = $1", id).Scan(&uid)
+	return uid, err
 }
 
 func (db *PQProxy) NewRoom(uid string) (uint64, error) {
@@ -241,6 +251,41 @@ func (db *PQProxy) NewInvitation(roomId uint64, token string) (uint64, error) {
 	return id, err
 }
 
+func (db *PQProxy) AcceptInvitation(token string) (uint64, error) {
+	var roomId, id uint64
+
+	tx, err := db.Begin()
+	if err != nil {
+		log.Println("AcceptInvitation: ", err)
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	err = tx.QueryRow("SELECT id, room_id FROM invitation WHERE code = $1 AND used != TRUE", token).Scan(&id, &roomId)
+
+	if err != nil {
+		if err != sql.ErrNoRows {
+			log.Println("AcceptInvitation: ", err)
+		}
+		return 0, err
+	}
+
+	/* Invalidate */
+	_, err = tx.Exec("UPDATE invitation SET used = TRUE WHERE id = $1", id)
+	if err != nil {
+		log.Println("AcceptInvitation: ", err)
+		return 0, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Println("AcceptInvitation: ", err)
+		return 0, err
+	}
+
+	return roomId, err
+}
+
 func (db *PQProxy) LoadSession(sid string, name string) (string, error) {
 	var data string
 	/*err := db.QueryRow("SELECT data FROM session WHERE sid = $1 AND name = $2 AND CURRENT_TIMESTAMP - timestamp < ttl", sid, name).Scan(&data)*/
@@ -271,9 +316,9 @@ func (db *PQProxy) SaveSession(sid string, name string, data string) error {
 	return err
 }
 
-func (db *PQProxy) SyncUser(cid uint64, name, picture, token string, expires time.Time) error {
-	res, err := db.Exec("UPDATE client SET name = $1, picture = $2, access_token = $3, expires = $4 WHERE id = $5",
-						name, picture, token, expires, cid)
+func (db *PQProxy) SyncUser(cid uint64, name, picture, token, link string, expires time.Time) error {
+	res, err := db.Exec("UPDATE client SET name = $1, picture = $2, access_token = $3, link = $4, expires = $5 WHERE id = $6",
+						name, picture, token, link, expires, cid)
 
 	if err != nil {
 		log.Println("SyncUser: ", err)
@@ -281,8 +326,8 @@ func (db *PQProxy) SyncUser(cid uint64, name, picture, token string, expires tim
 	}
 
 	if affected, _ := res.RowsAffected(); affected == 0 {
-		_, err = db.Exec("INSERT INTO client (id, name, picture, access_token, expires) VALUES ($1, $2, $3, $4, $5)",
-						cid, name, picture, token, expires)
+		_, err = db.Exec("INSERT INTO client (id, name, picture, access_token, link, expires) VALUES ($1, $2, $3, $4, $5, $6)",
+						cid, name, picture, token, link, expires)
 
 		if err != nil {
 			log.Println("SyncUser: ", err)
@@ -293,18 +338,19 @@ func (db *PQProxy) SyncUser(cid uint64, name, picture, token string, expires tim
 }
 
 func (db *PQProxy) GetUserProfile(cid uint64) (*UserProfile, error) {
-	var name, picture sql.NullString
+	var name, picture, link sql.NullString
 
-	err := db.QueryRow("SELECT name, picture FROM client WHERE id = $1", cid).Scan(&name, &picture)
+	err := db.QueryRow("SELECT name, picture, link FROM client WHERE id = $1", cid).Scan(&name, &picture, &link)
 
 	if err != nil && err != sql.ErrNoRows {
 		log.Println("GetProfile: ", err)
 	}
 
 	profile := UserProfile {
-		ID: cid,
+		ID: strconv.FormatUint(cid, 10),
 		Name: name.String,
 		Picture: picture.String,
+		Link: link.String,
 	}
 
 	return &profile, err
@@ -312,25 +358,26 @@ func (db *PQProxy) GetUserProfile(cid uint64) (*UserProfile, error) {
 
 func (db *PQProxy) GetPlayerProfile(cid, roomId uint64) (*UserProfile, error) {
 	var (
-		name, picture, scheme sql.NullString
+		name, picture, scheme, link sql.NullString
 		pid uint64
 		ts time.Time
 	)
 
-	err := db.QueryRow("SELECT name, picture, player.id, color_scheme, timestamp FROM client LEFT JOIN player ON client.id = player.client_id " +
-						"WHERE client.id = $1 AND player.room_id = $2", cid, roomId).Scan(&name, &picture, &pid, &scheme, &ts)
+	err := db.QueryRow("SELECT name, picture, link, player.id, color_scheme, timestamp FROM client LEFT JOIN player ON client.id = player.client_id " +
+						"WHERE client.id = $1 AND player.room_id = $2", cid, roomId).Scan(&name, &picture, &link, &pid, &scheme, &ts)
 
 	if err != nil && err != sql.ErrNoRows {
 		log.Println("GetProfileRoom: ", err)
 	}
 
 	profile := UserProfile {
-		ID: cid,
+		ID: strconv.FormatUint(cid, 10),
 		Name: name.String,
 		Picture: picture.String,
 		Player: pid,
 		Scheme: scheme.String,
 		Timestamp: ts,
+		Link: link.String,
 	}
 
 	return &profile, err
@@ -339,29 +386,31 @@ func (db *PQProxy) GetPlayerProfile(cid, roomId uint64) (*UserProfile, error) {
 func (db *PQProxy) GetPlayers(roomId uint64) ([]UserProfile, error) {
 	var result []UserProfile
 
-	rows, err := db.Query("SELECT client.id, name, picture, player.id, color_scheme, timestamp FROM client LEFT JOIN player ON client.id = player.client_id " +
-						"WHERE player.room_id = $1 ORDER BY timestamp", roomId)
+	rows, err := db.Query("SELECT client.id, name, picture, link, player.id, color_scheme, timestamp " +
+						"FROM client LEFT JOIN player ON client.id = player.client_id " +
+						"WHERE player.room_id = $1 ORDER BY player.id", roomId)
 
 	if err != nil {return nil, err}
 	defer rows.Close()
 
 	for rows.Next() {
 		var (
-			name, picture, scheme sql.NullString
+			name, picture, scheme, link sql.NullString
 			cid, pid uint64
 			ts time.Time
 		)
 
-		err = rows.Scan(&cid, &name, &picture, &pid, &scheme, &ts)
+		err = rows.Scan(&cid, &name, &picture, &link ,&pid, &scheme, &ts)
 		if err != nil {return nil, err}
 
 		result = append(result, UserProfile {
-			ID: cid,
+			ID: strconv.FormatUint(cid, 10),
 			Name: name.String,
 			Picture: picture.String,
 			Player: pid,
 			Scheme: scheme.String,
 			Timestamp: ts,
+			Link: link.String,
 		})
 	}
 

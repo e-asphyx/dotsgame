@@ -41,14 +41,6 @@ window.Controllers = window.Controllers || {};
 		_.extend(this, obj);
 	};
 
-	function RGB(v) {
-		return "rgb(" + v[0] + "," + v[1] + "," + v[2] + ")";
-	}
-
-	function RGBA(v, a) {
-		return "rgba(" + v[0] + "," + v[1] + "," + v[2] + "," + a + ")";
-	}
-
 	function RubberBand(objdata) {
 		if(objdata instanceof Array) {
 			/* Generic consructor */
@@ -537,7 +529,7 @@ window.Controllers = window.Controllers || {};
 		},
 
 		onMessage: function(evt) {
-			var msg = JSON.parse(event.data);
+			var msg = JSON.parse(evt.data);
 			if(!(msg.fl & this.FL_KEEPALIVE)) console.log(msg);
 
 			if(msg.players) {
@@ -550,7 +542,7 @@ window.Controllers = window.Controllers || {};
 					
 					/* Notify */
 					this.trigger("change:player", {
-						id: Number(cid),
+						id: String(cid),
 						scheme: this.players[cid]
 					});
 				}, this);
@@ -647,7 +639,7 @@ window.Controllers = window.Controllers || {};
 			var ctx = this.canvas.get(0).getContext("2d");
 			ctx.save();
 		
-			ctx.fillStyle = RGB(this.style.schemes[scheme]);
+			ctx.fillStyle = Utils.RGB(this.style.schemes[scheme]);
 			
 			ctx.beginPath();
 			ctx.arc(pad + Math.round(point.x * this.gridStep) + 0.5,
@@ -671,8 +663,8 @@ window.Controllers = window.Controllers || {};
 					ctx.save();
 
 					ctx.setStyle(this.style.player.area.style);
-					ctx.strokeStyle = RGB(this.style.schemes[this.players[cid]]);
-					ctx.fillStyle = RGBA(this.style.schemes[this.players[cid]], this.style.player.area.alpha);
+					ctx.strokeStyle = Utils.RGB(this.style.schemes[this.players[cid]]);
+					ctx.fillStyle = Utils.RGBA(this.style.schemes[this.players[cid]], this.style.player.area.alpha);
 
 					ctx.beginPath();
 					ctx.moveTo(
@@ -912,10 +904,17 @@ window.Controllers = window.Controllers || {};
 		getPlayers: function() {
 			return _.map(this.players, function(scheme, cid) {
 				return {
-					id: Number(cid),
+					id: String(cid),
 					scheme: scheme
 				};
 			});
+		},
+
+		destroy: function() {
+			if(this.conn && this.conn.readyState == WebSocket.OPEN) {
+				this.conn.onclose = null;
+				this.conn.close();
+			}
 		}
 	});
 
@@ -953,16 +952,18 @@ window.Controllers = window.Controllers || {};
 		}
 	}
 
-	window.Controllers.GameController = function() {
+	Controllers.GameController = function() {
 		this.game = new Game.App({
 			style: Game.style,
 			xnodes: 40,
 			ynodes: 30,
 		});
 		
-		this.listenTo(this.game, "change:player", this.playerChange);
-		this.listenTo(this.game, "change:free", this.freeChange);
-
+		var self = this;
+		$(window).on("beforeunload", function() {
+			self.game.destroy();
+		});
+		
 		/* "Left" indicator */
 		this.freeNodes = new Backbone.Model({value: this.game.getFreeNodes()});
 		this.freeNodesView = new Views.NumericIndicator({
@@ -970,16 +971,36 @@ window.Controllers = window.Controllers || {};
 			model: this.freeNodes
 		});
 		$("#indicators").prepend(this.freeNodesView.render().el);
+		this.listenTo(this.game, "change:free", this.freeChange);
 
 		/* Users */
-		this.players = new Collections.Users(this.game.getPlayers());
+		this.players = new Collections.Users();
+		this.listenTo(this.game, "change:player", this.playerChange);
+
+		this.playersView = new Views.PlayersList({
+			el: "#players-list-box",
+			collection: this.players
+		});
+		this.playersView.render();
+		
+		this.players.set(this.game.getPlayers(), {remove: false});
 		this.players.fetch();
+
+		/* Color picker */
+		this.colors = new Backbone.Collection();
+		this.colorPicker = new Views.ColorPicker({
+			collection: this.colors,
+			schemes: Game.style.schemes
+		});
+		$("body").append(this.colorPicker.render().el);
 	};
 	_.extend(Controllers.GameController.prototype, Backbone.Events, {
 		playerChange: function(p) {
-			var m = new Models.User(p);
-			this.players.set(m);
-			m.fetch(); /* update */
+			var model = new Models.User(p);
+			var self = this;
+			model.fetch({success: function(m) {
+				self.players.set(m, {remove: false});
+			}});
 		},
 		
 		freeChange: function(n) {

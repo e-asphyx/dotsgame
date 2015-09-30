@@ -12,6 +12,7 @@ type Point struct {
 
 type GameMessage struct {
 	roomId uint64 `json:"-"`
+	sender *Client `json:"-"`
 
 	CID uint64 `json:"cid"`
 	Flags uint `json:"fl"`
@@ -21,6 +22,8 @@ type GameMessage struct {
 
 	Players map[string]string `json:"players,omitempty"`
 	Leave []uint64 `json:"leave,omitempty"`
+
+	sync chan<- bool `json:"-"`
 }
 
 type Client struct {
@@ -50,6 +53,8 @@ type GamePool struct {
 	get chan uint64
 	put chan uint64
 }
+
+/* TODO: report online/offline users */
 
 func (srv *GameServer) gameServer() {
 	clients := list.New()
@@ -84,10 +89,14 @@ func (srv *GameServer) gameServer() {
 			}
 			/* TODO leave */
 
+			if msg.sync != nil {
+				msg.sync <- true
+			}
+
 			for e := clients.Front(); e != nil; e = e.Next() {
 				client := e.Value.(*Client)
 
-				if client.cid != msg.CID {
+				if msg.sender != client {
 					client.msg <- msg
 				}
 			}

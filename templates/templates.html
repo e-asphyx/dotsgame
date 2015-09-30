@@ -2,8 +2,8 @@
 	<!-- Top-right menu -->
 	<script type="text/template" id="user-profile-template">
 		<div class="dropdown">
-			<a href="#"><div class="user-picture" style="background-image: url('<%= o.picture || "/static/images/user.svg" %>');"></div></a>
-			<div class="dropdown-container left">
+			<a href="#" class="user-picture" style="background-image: url('<%= o.picture || "/static/images/user.svg" %>');"></a>
+			<div class="dropdown-container left bottom">
 				<div class="profile-flexbox">
 					<div class="profile-user-picture flexbox-item" style="background-image: url('<%= o.picture || "/static/images/user.svg" %>');">
 					</div>
@@ -20,5 +20,45 @@
 	<script type="text/template" id="numeric-indicator-template">
 		<div class="caption"><%= title %></div>
 		<div class="label"><%- value %></div>
+	</script>
+	
+	<!-- Color picker -->
+	<script type="text/template" id="scheme-picker-template">
+		<div class="modal-content">
+			<a href="#" class="modal-close"><i class="fa fa-times-circle-o"></i></a>
+			<div class="modal-header">
+				<h4>Select color scheme</h4>
+			</div>
+			<div class="modal-body color-picker">
+				<% _.each(items, function(item) { %>
+					<a class="color-picker-item" href="#" style="background-color: <%= Utils.RGB(schemes[item.id]) %>;" data="<%= item.id %>"></a>
+				<% }); %>
+			</div>
+		</div>
+	</script>
+
+	<!-- Bottom-right menu -->
+	<script type="text/template" id="players-list-template">
+		<% _.each(players, function(p) { %>
+			<div class="dropdown user-list-item">
+				<a href="#" class="user-list-picture" style="background-image: url('<%= p.picture || "/static/images/user.svg" %>');"></a>
+				<div class="dropdown-container user-list-dropdown">
+					<div class="profile-flexbox">
+						<%if(p.link){%><a href="<%= p.link %>" class="flexbox-item" target="_blank"><%}%>
+							<div class="profile-user-picture flexbox-item" style="background-image: url('<%= p.picture || "/static/images/user.svg" %>');">
+							</div>
+						<%if(p.link){%></a><%}%>
+						
+						<div class="flexbox-item">
+							<p>
+								<%if(p.link){%><a href="<%= p.link %>" target="_blank"><%}%>
+									<%- p.name || ("#" + p.id) %>
+								<%if(p.link){%></a><%}%>
+							</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		<% }); %>
 	</script>
 {{end}}
