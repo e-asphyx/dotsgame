@@ -8,6 +8,10 @@ html, body {
 	color: #594928;
 	font-family: "Lato", sans-serif;
 	font-size: 1em;
+	height: 100%;
+}
+
+#wrapper {
 	min-height: 100%;
 }
 
